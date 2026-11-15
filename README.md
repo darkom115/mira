@@ -18,7 +18,8 @@ navegador.
 ```
 sitio/index.html   Sitio público: globo, filtros, lista, expediente,
                    formulario de 4 pasos, cuentas, votos y aportes, ES/EN
-sitio/admin.html   Panel de moderación (se abre en /admin.html)
+sitio/admin.html   Panel de moderación del administrador (/admin.html)
+sitio/revision.html Sala de revisión de los curadores (/revision.html)
 sql/               Cambios a la base de datos, en orden (ver abajo)
 docs/              Informes y especificaciones de mejoras
 netlify/           Función que genera la vista previa de los enlaces ?caso=
@@ -45,6 +46,8 @@ Ya se corrieron todos, en este orden, sobre el proyecto de Supabase:
    para el respaldo diario.
 10. `origen.sql` — separa los avistamientos de los casos documentados y saca la
     fuente a su propio campo.
+11. `curadores.sql` — reparte la decisión de qué se publica: los curadores votan
+    y dos coincidencias deciden.
 
 `semilla.sql` es opcional: mete casos de ejemplo.
 

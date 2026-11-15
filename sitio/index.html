@@ -13,6 +13,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" href="favicon-32.png" sizes="32x32">
+  <link rel="apple-touch-icon" href="icono-180.png">
+
   <title>MIRA — Mapa de Incidentes y Reportes Anómalos</title>
 
   <!-- Tipografías: IBM Plex Mono (pantallas) y Special Elite (máquina de escribir) -->
@@ -671,6 +675,7 @@
       <div id="vista-perfil" hidden>
         <h2 data-i18n="tuCuenta">Tu cuenta</h2>
         <p class="nota" id="perfil-datos"></p>
+        <a id="link-revision" href="revision.html" class="entrar secundario" data-i18n="salaRevision" hidden>Sala de revisión</a>
         <a id="link-panel" href="admin.html" class="entrar" data-i18n="panelAdmin" hidden>Panel de administración</a>
         <button type="button" class="entrar secundario" id="btn-salir" data-i18n="salir">Salir</button>
         <p class="enlaces"><button type="button" id="btn-eliminar-cuenta" data-i18n="eliminarCuenta">Eliminar mi cuenta</button></p>
@@ -1024,6 +1029,8 @@
         ayudaFuente: "Se publica junto al caso para que cualquiera pueda comprobarlo.",
         faltaFuente: "Indica de dónde sacaste el caso.",
         selloDocumentado: "Caso documentado", fuente: "Fuente",
+        revision: "Revisión", revisadoPor: "Revisado por {n} curador(es) de la comunidad",
+        salaRevision: "Sala de revisión",
         crearCuenta: "Crear cuenta", yaTengo: "Ya tengo cuenta",
         tuCuenta: "Tu cuenta", sesionComo: "Sesión iniciada como ",
         panelAdmin: "Panel de administración",
@@ -1240,6 +1247,8 @@
         ayudaFuente: "It's published with the case so anyone can check it.",
         faltaFuente: "Say where you took the case from.",
         selloDocumentado: "Documented case", fuente: "Source",
+        revision: "Review", revisadoPor: "Reviewed by {n} community curator(s)",
+        salaRevision: "Review room",
         crearCuenta: "Create account", yaTengo: "I already have an account",
         tuCuenta: "Your account", sesionComo: "Signed in as ",
         panelAdmin: "Admin panel",
@@ -1619,6 +1628,7 @@
             <dt>${t("testigo")}</dt><dd><span class="tachado">${t("nombreReservado")}</span></dd>
             <dt>${t("evidencia")}</dt><dd><span class="evidencia-barra" title="${t("explicaEvidencia")}">${"●".repeat(ev)}${"○".repeat(5 - ev)}</span> ${ev}/5<br><small class="glosa">${t("evidenciaCorto")}</small></dd>
             ${r.fuente ? `<dt>${t("fuente")}</dt><dd>${enlaceFuente(r.fuente)}</dd>` : ""}
+            ${r.revisado_por ? `<dt>${t("revision")}</dt><dd>${t("revisadoPor").replace("{n}", Number(r.revisado_por))}</dd>` : ""}
             ${r.explicacion ? `<dt>${t("dictamen")}</dt><dd><b>${escapar(r.explicacion)}</b></dd>` : ""}
           </dl>
           <p>${escapar(r.descripcion)}</p>
@@ -2430,7 +2440,7 @@
     // por nuestro código más que para enviarla cifrada (https) a Supabase.
     let sesion = null;     // la sesión actual (o null)
     let perfil = null;     // { alias }
-    let esAdmin = false;
+    let esAdmin = false, esCurador = false;
 
     const login = $("login");
     const VISTAS = ["entrar", "crear", "perfil", "clave"];
@@ -2453,6 +2463,7 @@
       document.querySelectorAll(".btn-cuenta").forEach(b => { b.textContent = texto; });
       $("perfil-datos").textContent = sesion ? t("sesionComo") + "@" + (perfil ? perfil.alias : "?") + " · " + sesion.user.email : "";
       $("link-panel").hidden = !esAdmin;
+      $("link-revision").hidden = !esCurador;
       // Si hay un expediente abierto, actualizamos sus botones de voto
       document.querySelectorAll(".comunidad").forEach(c => {
         const r = todos.find(x => String(x.id) === c.dataset.id);
@@ -2484,14 +2495,16 @@
       if (!usarNube) { pintarCuenta(); return; }
       const { data } = await db.auth.getSession();
       sesion = data.session;
-      perfil = null; esAdmin = false;
+      perfil = null; esAdmin = false; esCurador = false;
       if (sesion) {
-        const [p, a] = await Promise.all([
+        const [p, a, c] = await Promise.all([
           db.from("perfiles").select("alias").eq("user_id", sesion.user.id).maybeSingle(),
-          db.rpc("es_admin")
+          db.rpc("es_admin"),
+          db.rpc("es_curador")
         ]);
         perfil = p.data;
         esAdmin = a.data === true;
+        esCurador = c.data === true;
         if (!perfil && !p.error) await crearPerfil();
       }
       pintarCuenta();

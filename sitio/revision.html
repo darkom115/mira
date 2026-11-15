@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<!--
+  MIRA — Sala de revisión
+  ------------------------------------------
+  Para los curadores: las personas de confianza que deciden, en
+  conjunto, qué entra al archivo.
+
+  Cada curador vota una vez por caso. Cuando dos coinciden, la base
+  de datos mueve el caso sola. Nadie puede borrar nada desde aquí:
+  eso sigue siendo cosa del administrador.
+
+  Si alguien que no es curador abre esta página, no verá ningún
+  caso: las reglas de la base no se lo permiten.
+-->
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" href="favicon-32.png" sizes="32x32">
+  <link rel="apple-touch-icon" href="icono-180.png">
+
+  <title>MIRA — Sala de revisión</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <style>
+    :root { --abismo:#05080A; --consola:#0C1316; --linea:#22312F; --ambar:#F2B23A; --tenue:#7E8B86; --sello:#E5484D; --ok:#4FD1C5; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: "IBM Plex Mono", ui-monospace, monospace; background: var(--abismo); color: #D9DED9; font-size: 14px; line-height: 1.5; }
+    button, input, select, textarea { font: inherit; color: inherit; }
+    button { cursor: pointer; background: none; border: 1px solid var(--linea); padding: 7px 12px; }
+    button:hover { border-color: var(--ambar); color: var(--ambar); }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    :focus-visible { outline: 2px solid var(--ambar); outline-offset: 2px; }
+    a { color: var(--ambar); }
+    [hidden] { display: none !important; }
+
+    header { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; padding: 14px 20px; border-bottom: 1px solid var(--linea); }
+    header strong { color: var(--ambar); letter-spacing: .08em; }
+    header span { color: var(--tenue); }
+    header .espacio { flex: 1; }
+    main { max-width: 980px; margin: 0 auto; padding: 20px; }
+    #mensaje { margin: 12px 0; color: var(--tenue); min-height: 20px; }
+
+    #entrar { max-width: 340px; margin-top: 30px; display: grid; gap: 10px; }
+    #entrar input { background: var(--consola); border: 1px solid var(--linea); padding: 9px; width: 100%; }
+    #entrar button[type="submit"] { background: var(--ambar); color: var(--abismo); font-weight: 600; border: none; padding: 10px; }
+    #entrar .proveedor { border: 1px solid var(--linea); padding: 10px; }
+
+    .reglas { border: 1px solid var(--linea); padding: 12px 14px; margin-bottom: 18px; color: var(--tenue); font-size: 13px; }
+    .reglas b { color: var(--ambar); font-weight: 600; }
+    .reglas ul { margin: 6px 0 0 18px; }
+
+    .ficha { display: grid; grid-template-columns: 170px 1fr; gap: 16px; padding: 16px; margin-top: 12px; background: var(--consola); border: 1px solid var(--linea); }
+    .ficha img { width: 170px; height: 125px; object-fit: cover; display: block; border: 1px solid var(--linea); }
+    .ficha .sin-foto { width: 170px; height: 125px; display: grid; place-items: center; border: 1px dashed var(--linea); color: var(--tenue); font-size: 12px; }
+    .ficha h3 { font-size: 15px; color: var(--ambar); }
+    .ficha .meta { color: var(--tenue); font-size: 12px; margin: 2px 0 8px; }
+    .ficha .desc { overflow-wrap: anywhere; max-width: 70ch; }
+    .aviso { color: #F2B23A; font-size: 12px; }
+
+    .votos { display: flex; flex-wrap: wrap; gap: 10px; margin: 10px 0 2px; font-size: 12px; color: var(--tenue); }
+    .votos b { color: #D9DED9; font-weight: 600; }
+    .controles { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; align-items: center; }
+    .controles input { flex: 1; min-width: 200px; background: var(--abismo); border: 1px solid var(--linea); padding: 7px; }
+    .publicar { border-color: var(--ok); color: var(--ok); }
+    .descartar { border-color: var(--sello); color: var(--sello); }
+    .ya-vote { color: var(--ok); font-size: 12px; }
+    .vacio { color: var(--tenue); margin-top: 14px; }
+
+    @media (max-width: 600px) { .ficha { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <header>
+    <strong>MIRA</strong>
+    <span>Sala de revisión</span>
+    <div class="espacio"></div>
+    <a href="index.html">← Volver al globo</a>
+    <button id="salir" hidden>Cerrar sesión</button>
+  </header>
+
+  <main>
+    <form id="entrar" hidden>
+      <p>Entra con tu cuenta de curador.</p>
+      <button type="button" class="proveedor" id="con-discord">Entrar con Discord</button>
+      <label for="correo">Correo</label>
+      <input id="correo" type="email" autocomplete="username" required>
+      <label for="clave">Contraseña</label>
+      <input id="clave" type="password" autocomplete="current-password" required>
+      <button type="submit">Entrar</button>
+    </form>
+
+    <p id="mensaje" role="status"></p>
+
+    <section id="panel" hidden>
+      <div class="reglas">
+        <b>Cómo funciona</b>
+        <ul>
+          <li>Cada curador vota una vez por caso, y el voto no se puede cambiar.</li>
+          <li>Cuando <b>dos curadores coinciden</b>, el caso se mueve solo.</li>
+          <li>Publicar no significa dar por cierto el avistamiento: significa que el reporte está completo y es de buena fe.</li>
+          <li>Descarta solo lo que es spam, broma o imposible de ubicar. Si falta información, usa «faltan datos».</li>
+        </ul>
+      </div>
+      <p id="resumen"></p>
+      <div id="lista"></div>
+    </section>
+  </main>
+
+  <script>
+    const SUPABASE_URL = "https://qaseuvsoghhlwkmnisln.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_iCFgjYpkNpC89MU--Im12w_IMmMx7cq";
+    const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    const $ = (id) => document.getElementById(id);
+    const decir = (t) => { $("mensaje").textContent = t; };
+    let yo = null, reportes = [], revisiones = [];
+
+    const NOMBRE_CAT = { fani: "FANI", criptido_alado: "Críptido alado", bestia_atmosferica: "Bestia atmosférica", varillas: "Varillas (rods)", serpiente: "Serpiente del cielo", sin_clasificar: "Sin clasificar" };
+    const NOMBRE_VOTO = { publicar: "publicar", datos_insuficientes: "faltan datos", descartar: "descartar" };
+
+    // Crear elementos sin innerHTML: lo que escribió un desconocido
+    // nunca se interpreta como código.
+    function crear(etiqueta, props = {}, hijos = []) {
+      const e = document.createElement(etiqueta);
+      Object.entries(props).forEach(([k, v]) => { if (k === "class") e.className = v; else if (k in e) e[k] = v; else e.setAttribute(k, v); });
+      hijos.forEach(h => e.append(h));
+      return e;
+    }
+    const fecha = (f) => new Date(f).toLocaleString("es-MX", { dateStyle: "medium", timeStyle: "short" });
+
+    // ---------- Sesión ----------
+    async function iniciar() {
+      const { data } = await db.auth.getSession();
+      if (!data.session) { $("entrar").hidden = false; $("panel").hidden = true; $("salir").hidden = true; decir(""); return; }
+      yo = data.session.user.id;
+      $("salir").hidden = false;
+
+      const curador = await db.rpc("es_curador");
+      if (curador.data !== true) {
+        $("entrar").hidden = true; $("panel").hidden = true;
+        decir("Esta cuenta todavía no es curadora. Pídele acceso a quien administra el archivo.");
+        return;
+      }
+      $("entrar").hidden = true;
+      $("panel").hidden = false;
+      await cargar();
+    }
+
+    $("con-discord").addEventListener("click", async () => {
+      const { error } = await db.auth.signInWithOAuth({ provider: "discord", options: { redirectTo: location.href } });
+      if (error) decir("No se pudo abrir Discord.");
+    });
+    $("entrar").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      decir("Verificando…");
+      const { error } = await db.auth.signInWithPassword({ email: $("correo").value.trim(), password: $("clave").value });
+      if (error) { decir("Correo o contraseña incorrectos."); return; }
+      e.target.reset();
+      iniciar();
+    });
+    $("salir").addEventListener("click", async () => { await db.auth.signOut(); yo = null; iniciar(); });
+
+    // ---------- La cola ----------
+    async function cargar() {
+      decir("Cargando…");
+      const [r, v] = await Promise.all([
+        db.from("reportes").select("*").eq("estado", "pendiente").order("creado", { ascending: true }),
+        db.from("revisiones").select("*")
+      ]);
+      if (r.error) { decir("No se pudo cargar la cola: " + r.error.message); return; }
+      reportes = r.data || [];
+      revisiones = v.data || [];
+      decir("");
+      pintar();
+    }
+
+    function pintar() {
+      const pendientes = reportes.filter(x => x.estado === "pendiente");
+      $("resumen").textContent = pendientes.length
+        ? `${pendientes.length} caso(s) esperando revisión. El más antiguo lleva desde ${fecha(pendientes[0].creado)}.`
+        : "";
+      $("lista").replaceChildren(...(pendientes.length
+        ? pendientes.map(ficha)
+        : [crear("p", { class: "vacio", textContent: "No hay nada pendiente. El archivo está al día." })]));
+    }
+
+    function ficha(r) {
+      const mias = revisiones.filter(x => x.reporte_id === r.id);
+      const miVoto = mias.find(x => x.user_id === yo);
+      const cuenta = (v) => mias.filter(x => x.voto === v).length;
+
+      const foto = r.foto_url
+        ? crear("a", { href: r.foto_url, target: "_blank", rel: "noopener" }, [crear("img", { src: r.foto_url, loading: "lazy", alt: "Foto del reporte" })])
+        : crear("div", { class: "sin-foto", textContent: "Sin foto" });
+
+      const nota = crear("input", { maxLength: 300, placeholder: "Nota para los demás curadores (opcional)", "aria-label": "Nota" });
+      const controles = [];
+
+      if (miVoto) {
+        controles.push(crear("p", { class: "ya-vote", textContent: `Ya votaste: ${NOMBRE_VOTO[miVoto.voto]}. Falta que otro curador coincida.` }));
+      } else {
+        [["publicar", "Publicar", "publicar"], ["datos_insuficientes", "Faltan datos", ""], ["descartar", "Descartar", "descartar"]]
+          .forEach(([voto, texto, clase]) => {
+            const b = crear("button", { class: clase, textContent: texto });
+            b.addEventListener("click", async () => {
+              if (voto === "descartar" && !confirm("¿Descartar este caso? Con dos votos iguales queda fuera del archivo.")) return;
+              controles.forEach(c => { if (c.tagName === "BUTTON") c.disabled = true; });
+              const res = await db.from("revisiones").insert({
+                reporte_id: r.id, user_id: yo, voto, nota: nota.value.trim() || null
+              }).select("id");
+              if (res.error) {
+                controles.forEach(c => { if (c.tagName === "BUTTON") c.disabled = false; });
+                decir("No se pudo registrar tu voto: " + res.error.message);
+                return;
+              }
+              decir("Voto registrado.");
+              await cargar();
+            });
+            controles.push(b);
+          });
+        controles.push(nota);
+      }
+
+      const datos = [
+        crear("h3", { textContent: `${NOMBRE_CAT[r.categoria] || r.categoria} — ${r.lugar}` }),
+        ...(r.revisar ? [crear("p", { class: "aviso", textContent: "⚠ " + r.revisar })] : []),
+        crear("p", { class: "meta", textContent: [
+          `visto ${fecha(r.fecha)}`,
+          `enviado ${fecha(r.creado)}`,
+          `${Number(r.lat).toFixed(2)}, ${Number(r.lng).toFixed(2)}`,
+          r.testigos ? `${r.testigos} testigo(s)` : "",
+          r.origen === "documentado" ? "caso documentado" : "avistamiento",
+          r.fuente ? "fuente: " + r.fuente : ""
+        ].filter(Boolean).join(" · ") }),
+        crear("p", { class: "desc", textContent: r.descripcion }),
+        crear("div", { class: "votos" }, [
+          crear("span", {}, [crear("b", { textContent: String(cuenta("publicar")) }), document.createTextNode(" publicar")]),
+          crear("span", {}, [crear("b", { textContent: String(cuenta("datos_insuficientes")) }), document.createTextNode(" faltan datos")]),
+          crear("span", {}, [crear("b", { textContent: String(cuenta("descartar")) }), document.createTextNode(" descartar")])
+        ]),
+        ...mias.filter(x => x.nota).map(x => crear("p", { class: "meta", textContent: "« " + x.nota + " »" })),
+        crear("div", { class: "controles" }, controles)
+      ];
+      if (r.youtube_id) datos.splice(3, 0, crear("p", {}, [crear("a", { href: "https://www.youtube.com/watch?v=" + encodeURIComponent(r.youtube_id), target: "_blank", rel: "noopener", textContent: "▶ Ver video en YouTube" })]));
+
+      return crear("article", { class: "ficha" }, [foto, crear("div", {}, datos)]);
+    }
+
+    db.auth.onAuthStateChange(() => iniciar());
+    iniciar();
+  </script>
+</body>
+</html>
