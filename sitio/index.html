@@ -122,17 +122,13 @@
     #login input:focus { outline: none; background: rgba(255,255,255,0.35); }
     #login .entrar { margin-top: 20px; width: 100%; padding: 10px; background: var(--tinta); color: var(--manila); font-family: var(--mono); font-weight: 600; }
     #login .cerrar { position: absolute; top: 8px; right: 12px; font-size: 22px; color: var(--tinta); }
-    .con-google {
+    .proveedor {
       width: 100%; margin-top: 10px; padding: 9px 12px; background: transparent;
       border: 1px solid var(--linea); color: var(--ambar); font: inherit; font-size: 13px;
       display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer;
     }
-    .con-google:hover { border-color: var(--ambar); }
-    .con-google::before {
-      content: ""; width: 14px; height: 14px; flex: none;
-      background: conic-gradient(from -45deg, #EA4335 0 25%, #FBBC05 0 50%, #34A853 0 75%, #4285F4 0);
-      border-radius: 50%;
-    }
+    .proveedor:hover { border-color: var(--ambar); }
+    .proveedor .marca { width: 10px; height: 10px; border-radius: 50%; flex: none; background: var(--c); }
     .separador { margin: 12px 0 2px; font-size: 11px; color: var(--tenue); text-align: center; }
     #login-error { margin-top: 10px; font-family: var(--mono); font-size: 12px; color: var(--sello); min-height: 16px; }
     #sesion { font-size: 11px; color: var(--sello); border: 1px solid var(--sello); padding: 6px 8px; white-space: nowrap; }
@@ -639,8 +635,7 @@
       <form id="vista-entrar">
         <h2 id="login-titulo" data-i18n="entrarTitulo">Entrar al archivo</h2>
         <p class="nota" data-i18n="entrarIntro"></p>
-        <button type="button" class="con-google" data-i18n="conGoogle">Entrar con Google</button>
-        <p class="separador"><span data-i18n="oBien">o con tu correo</span></p>
+        <div class="proveedores" data-modo="entrar"></div>
         <label for="login-correo" data-i18n="correo">Correo</label>
         <input id="login-correo" type="email" autocomplete="email" required>
         <label for="login-clave" data-i18n="contrasena">Contraseña</label>
@@ -652,8 +647,7 @@
       <!-- Crear cuenta -->
       <form id="vista-crear" hidden>
         <h2 data-i18n="crearTitulo">Crear cuenta</h2>
-        <button type="button" class="con-google" data-i18n="crearConGoogle">Crear cuenta con Google</button>
-        <p class="separador"><span data-i18n="oBien">o con tu correo</span></p>
+        <div class="proveedores" data-modo="crear"></div>
         <label for="reg-alias" data-i18n="alias">Alias público</label>
         <input id="reg-alias" required minlength="3" maxlength="20" pattern="[A-Za-z0-9_]+" autocomplete="nickname">
         <p class="nota" data-i18n="aliasAyuda"></p>
@@ -999,9 +993,9 @@
         privCorto: "Privacidad", privTitulo: "Aviso de privacidad",
         cerrar: "Cerrar",
         tipoRegistro: "Tipo de registro",
-        conGoogle: "Entrar con Google", crearConGoogle: "Crear cuenta con Google",
+        entrarCon: "Entrar con ", crearCon: "Crear cuenta con ",
         oBien: "o con tu correo",
-        errorGoogle: "No se pudo abrir Google. Intenta de nuevo o entra con tu correo.",
+        errorProveedor: "No se pudo abrir ",
         notaObligatorios: "Los campos con * son obligatorios.",
         notaSinCuenta: "No necesitas cuenta para reportar. La cuenta solo sirve para votar y aportar en los casos.",
         enElGlobo: "En el globo: ",
@@ -1215,9 +1209,9 @@
         privCorto: "Privacy", privTitulo: "Privacy notice",
         cerrar: "Close",
         tipoRegistro: "Record type",
-        conGoogle: "Sign in with Google", crearConGoogle: "Create account with Google",
+        entrarCon: "Sign in with ", crearCon: "Create account with ",
         oBien: "or with your email",
-        errorGoogle: "Google couldn't be opened. Try again or use your email.",
+        errorProveedor: "Couldn't open ",
         notaObligatorios: "Fields marked * are required.",
         notaSinCuenta: "You don't need an account to report. An account is only for voting and adding to cases.",
         enElGlobo: "On the globe: ",
@@ -1335,6 +1329,14 @@
     const CONTACTO_EMAIL = "";
 
     const DONACIONES_URL = "https://ko-fi.com/darkom0115";
+
+    // Formas de entrar además del correo y la contraseña. Para agregar otra,
+    // actívala primero en Supabase (Authentication → Sign In / Providers) y
+    // añade aquí su clave y su color. Supabase trae google, github, discord,
+    // twitch, slack, notion y varias más.
+    const PROVEEDORES = [
+      { clave: "discord", nombre: "Discord", color: "#5865F2" }
+    ];
 
     const usarNube = Boolean(SUPABASE_URL && SUPABASE_KEY && window.supabase);
     const db = usarNube ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
@@ -2483,16 +2485,35 @@
       pintarCuenta();
     }
 
-    // Entrar con Google: Supabase lleva a Google y devuelve a esta misma
-    // página. Al volver, actualizarSesion() se encarga del resto.
-    document.querySelectorAll(".con-google").forEach(b => b.addEventListener("click", async () => {
-      $("login-error").textContent = "";
-      const { error } = await db.auth.signInWithOAuth({
-        provider: "google",
-        options: { redirectTo: location.origin + location.pathname + location.search }
+    // Entrar con otra cuenta: Supabase lleva al proveedor y devuelve a esta
+    // misma página. Al volver, actualizarSesion() se encarga del resto.
+    function pintarProveedores() {
+      document.querySelectorAll(".proveedores").forEach(caja => {
+        caja.innerHTML = "";
+        if (!usarNube || !PROVEEDORES.length) return;
+        PROVEEDORES.forEach(prov => {
+          const b = document.createElement("button");
+          b.type = "button";
+          b.className = "proveedor";
+          b.innerHTML = `<span class="marca" style="--c:${prov.color}"></span>` +
+            escapar((caja.dataset.modo === "crear" ? t("crearCon") : t("entrarCon")) + prov.nombre);
+          b.addEventListener("click", async () => {
+            $("login-error").textContent = "";
+            const { error } = await db.auth.signInWithOAuth({
+              provider: prov.clave,
+              options: { redirectTo: location.origin + location.pathname + location.search }
+            });
+            if (error) $("login-error").textContent = t("errorProveedor") + prov.nombre + ".";
+          });
+          caja.appendChild(b);
+        });
+        const sep = document.createElement("p");
+        sep.className = "separador";
+        sep.textContent = t("oBien");
+        caja.appendChild(sep);
       });
-      if (error) $("login-error").textContent = t("errorGoogle");
-    }));
+    }
+    pintarProveedores();
 
     document.querySelectorAll(".btn-cuenta").forEach(b => b.addEventListener("click", () => abrirCuenta()));
     $("login-cerrar").addEventListener("click", cerrarCuenta);
@@ -2770,6 +2791,7 @@
         aplicarIdioma();
         // Lo que se dibuja con JavaScript hay que volver a dibujarlo
         pintar();
+        pintarProveedores();
         pintarBrujula();
         mostrarPaso(pasoActual);
         pintarCuenta();
