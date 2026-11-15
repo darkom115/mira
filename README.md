@@ -41,6 +41,8 @@ Ya se corrieron todos, en este orden, sobre el proyecto de Supabase:
 6. `reestructura.sql`
 7. `papelera.sql`
 8. `seguridad.sql`
+9. `permisos-respaldo.sql` — deja que la clave `service_role` lea las tablas,
+   para el respaldo diario.
 
 `semilla.sql` es opcional: mete casos de ejemplo.
 
