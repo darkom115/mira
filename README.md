@@ -71,8 +71,8 @@ son las reglas (RLS) de la base de datos.
 
 En el proyecto colaboran dos asistentes de IA, y Omar es el puente entre ellos:
 
-- **Peluchín** investiga, modera contenido y escribe las especificaciones de
-  mejoras en `docs/`.
+- **Luna** (antes Peluchín, y antes MUSE) investiga, modera contenido, cura la
+  cola de pendientes y escribe las especificaciones de mejoras en `docs/`.
 - **Claude** implementa los cambios en el código.
 
 Las reglas completas (quién toca qué carpeta, cómo se entrega un cambio y qué

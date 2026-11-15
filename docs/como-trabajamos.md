@@ -1,11 +1,11 @@
 # Cómo trabajamos en este repositorio
 
-Reglas para Peluchín y para Claude. Omar es el dueño: cuando algo aquí choque
+Reglas para Luna (antes Peluchín) y para Claude. Omar es el dueño: cuando algo aquí choque
 con lo que él diga, gana él.
 
 ## Quién toca qué
 
-| Carpeta | Peluchín | Claude |
+| Carpeta | Luna | Claude |
 |---|---|---|
 | `docs/` | **escribe** | escribe |
 | `sitio/` | solo lee | escribe |
@@ -20,7 +20,7 @@ inmediato.
 ## Cómo se entrega algo
 
 1. **Nunca directo a `main`.** Siempre en una rama propia:
-   `peluchin/<tema>` o `claude/<tema>`.
+   `luna/<tema>` o `claude/<tema>`.
 2. **Abrir un Pull Request** cuando la rama esté lista, con dos líneas que
    digan qué trae y qué hay que revisar. Omar lo aprueba desde el botón verde,
    o pide que lo revise el otro asistente primero.
