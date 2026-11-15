@@ -1,0 +1,13 @@
+# Configuración de despliegue de MIRA en Netlify.
+#
+# Netlify lee este archivo solo. No hay que compilar nada: publica tal cual
+# lo que está en la carpeta "sitio".
+
+[build]
+  publish = "sitio"
+
+# Función que reescribe las etiquetas de vista previa cuando alguien comparte
+# un enlace del tipo /?caso=<id>. El código está en netlify/edge-functions/.
+[[edge_functions]]
+  path = "/"
+  function = "caso"

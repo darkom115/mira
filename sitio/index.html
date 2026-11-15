@@ -1,0 +1,2608 @@
+<!DOCTYPE html>
+<!--
+  MIRA — Mapa de Incidentes y Reportes Anómalos
+  -------------------------------------------------
+  Estética: una consola de rastreo satelital (pantalla oscura, letras
+  color ámbar) + expedientes de papel manila escritos a máquina con
+  sello rojo. Proyecto independiente; su autor firma como DARKOM en "Acerca de".
+
+  Funciones: globo 3D, buscar lugar o coordenadas, foto, video de
+  YouTube, filtros por tipo, y guardado local o en Supabase (PASO 0).
+-->
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MIRA — Mapa de Incidentes y Reportes Anómalos</title>
+
+  <!-- Tipografías: IBM Plex Mono (pantallas) y Special Elite (máquina de escribir) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Special+Elite&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.24.1/dist/maplibre-gl.css">
+  <script src="https://unpkg.com/maplibre-gl@5.24.1/dist/maplibre-gl.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+
+  <style>
+    /* ---------- Colores y fuentes (variables) ----------
+       Las variables CSS (--nombre) se definen una vez y se usan en
+       todos lados. Si cambias una aquí, cambia en toda la página. */
+    :root {
+      --abismo:  #05080A;   /* fondo de la pantalla */
+      --consola: #0C1316;   /* paneles de la pantalla */
+      --linea:   #22312F;   /* bordes finos */
+      --ambar:   #F2B23A;   /* fósforo ámbar: datos en pantalla */
+      --tenue:   #7E8B86;   /* texto secundario */
+      --manila:  #E4D3A8;   /* papel de expediente */
+      --tinta:   #1C1A16;   /* tinta de máquina de escribir */
+      --sello:   #B3261E;   /* sello rojo */
+
+      --fani:      #C9A2FF;   /* fenómeno aéreo no identificado */
+      --alado:     #F2B23A;   /* críptido alado */
+      --bestia:    #4FD1C5;   /* bestia atmosférica */
+      --varillas:  #F97316;   /* varillas / rods */
+      --serpiente: #7BD66B;   /* serpiente del cielo */
+      --otro:      #A3A3A3;   /* sin clasificar */
+
+      --mono: "IBM Plex Mono", ui-monospace, monospace;
+      --maquina: "Special Elite", "Courier New", monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: var(--mono); background: var(--abismo); color: var(--ambar); overflow: hidden; font-size: 14px; }
+    button { font: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+    :focus-visible { outline: 2px solid var(--ambar); outline-offset: 2px; }
+
+    /* ---------- Franja de clasificación ---------- */
+    #franja {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 30;
+      height: 22px; line-height: 22px; text-align: center;
+      background: var(--sello); color: #fff;
+      font-size: 11px; font-weight: 600; letter-spacing: 0.25em; text-transform: uppercase;
+      overflow: hidden; white-space: nowrap; text-overflow: ellipsis; padding: 0 10px;
+    }
+
+    /* ---------- Barra superior ---------- */
+    header {
+      position: fixed; top: 22px; left: 0; right: 0; z-index: 20;
+      height: 56px; padding: 0 20px;
+      display: flex; align-items: center; gap: 24px;
+      background: linear-gradient(var(--abismo), rgba(5,8,10,0.6));
+      border-bottom: 1px solid var(--linea);
+    }
+    .marca { display: flex; flex-direction: column; line-height: 1.2; }
+    .marca strong { font-size: 15px; letter-spacing: 0.08em; }
+    .marca span { font-size: 11px; color: var(--tenue); }
+    #reloj { margin-left: auto; color: var(--tenue); font-size: 12px; text-align: right; line-height: 1.3; }
+    #reloj b { color: var(--ambar); font-weight: 600; font-size: 14px; }
+    #btn-abrir {
+      border: 1px solid var(--ambar); padding: 9px 16px;
+      color: var(--ambar); font-weight: 600;
+    }
+    #btn-abrir:hover { background: var(--ambar); color: var(--abismo); }
+    /* Botones pequeños del encabezado */
+    .btn-chico { padding: 8px 10px; font-size: 12px; color: var(--tenue); border: 1px solid var(--linea); text-decoration: none; }
+    .btn-chico:hover { color: var(--ambar); border-color: var(--ambar); }
+    #btn-donar { color: var(--ambar); }
+    #btn-donar[hidden] { display: none; }
+
+    /* Aviso de ficción al pie */
+    #pie {
+      position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 10;
+      font-size: 11px; color: var(--tenue); white-space: nowrap;
+    }
+    #pie button { color: var(--tenue); text-decoration: underline; font-size: 11px; }
+
+    /* Ventana "Acerca de" */
+    #acerca {
+      position: fixed; inset: 0; z-index: 40; display: none;
+      background: rgba(0,0,0,0.7); align-items: center; justify-content: center; padding: 16px;
+    }
+    #acerca.abierto { display: flex; }
+    #acerca .hoja { width: 560px; max-width: 100%; max-height: 86vh; overflow-y: auto; padding: 26px 30px 28px; position: relative; }
+    #acerca h2 { font-size: 26px; font-weight: 400; margin: 4px 0 14px; }
+    #acerca p { font-size: 15px; line-height: 1.6; margin-bottom: 12px; max-width: 62ch; }
+    #acerca .num { font-family: var(--mono); font-size: 11px; color: #6b5f45; }
+    #acerca .cerrar { position: absolute; top: 10px; right: 14px; font-size: 22px; color: var(--tinta); }
+    #acerca .donar-hoja {
+      display: inline-block; margin-top: 6px; padding: 10px 16px;
+      background: var(--sello); color: #fff; font-family: var(--mono); font-weight: 600; text-decoration: none;
+    }
+    #acerca .donar-hoja[hidden] { display: none; }
+    #acerca .link-agente { display: block; margin-top: 18px; font-family: var(--mono); font-size: 11px; color: #6b5f45; text-decoration: underline; }
+
+    /* Acceso de administrador (administradores) */
+    #login { position: fixed; inset: 0; z-index: 50; display: none; background: rgba(0,0,0,0.75); align-items: center; justify-content: center; padding: 16px; }
+    #login.abierto { display: flex; }
+    #login .hoja { width: 380px; max-width: 100%; padding: 24px 26px; position: relative; }
+    #login h2 { font-size: 22px; font-weight: 400; margin-bottom: 6px; }
+    #login label { display: block; margin: 14px 0 4px; font-size: 14px; }
+    #login input { width: 100%; padding: 6px 2px; background: transparent; border: none; border-bottom: 1px solid var(--tinta); font-family: var(--maquina); font-size: 16px; color: var(--tinta); }
+    #login input:focus { outline: none; background: rgba(255,255,255,0.35); }
+    #login .entrar { margin-top: 20px; width: 100%; padding: 10px; background: var(--tinta); color: var(--manila); font-family: var(--mono); font-weight: 600; }
+    #login .cerrar { position: absolute; top: 8px; right: 12px; font-size: 22px; color: var(--tinta); }
+    #login-error { margin-top: 10px; font-family: var(--mono); font-size: 12px; color: var(--sello); min-height: 16px; }
+    #sesion { font-size: 11px; color: var(--sello); border: 1px solid var(--sello); padding: 6px 8px; white-space: nowrap; }
+    #sesion[hidden] { display: none; }
+    #sesion button { color: var(--sello); text-decoration: underline; font-size: 11px; margin-left: 6px; }
+
+    /* Notificación temporal (ej. "reporte recibido") */
+    #notificacion {
+      position: fixed; top: 96px; left: 50%; transform: translateX(-50%); z-index: 45;
+      max-width: 90vw; padding: 12px 18px; border: 1px solid var(--ambar);
+      background: rgba(5,8,10,0.95); display: none; line-height: 1.5;
+    }
+    #notificacion.visible { display: block; }
+
+    .sello.explicado { border-color: #1f4e9c; color: #1f4e9c; }
+
+    #login [hidden] { display: none !important; }
+    #login .nota { font-family: var(--mono); font-size: 11px; color: #6b5f45; line-height: 1.45; margin-top: 6px; }
+    #login .enlaces { margin-top: 14px; font-family: var(--mono); font-size: 12px; }
+    #login .enlaces button, #login .check button { text-decoration: underline; color: var(--tinta); font-size: inherit; font-family: inherit; }
+    #login .check { display: flex; gap: 8px; align-items: flex-start; font-family: var(--mono); font-size: 12px; margin-top: 16px; }
+    #login .check input { width: auto; margin-top: 2px; flex: none; }
+    #login .check > span { flex: 1; }
+    #login a.entrar { display: block; text-align: center; text-decoration: none; }
+    #login .entrar.secundario { background: transparent; color: var(--tinta); border: 1px solid var(--tinta); margin-top: 10px; }
+    .solo-movil { display: none; }
+
+    /* Votos y aportes dentro del expediente */
+    .expediente { max-height: 60vh; overflow-y: auto; }
+    .comunidad { margin-top: 14px; padding-top: 10px; border-top: 1px dashed #b9a77c; }
+    .comunidad h4 { font-family: var(--mono); font-size: 11px; font-weight: 600; color: #6b5f45; margin: 10px 0 6px; }
+    .comunidad .nota { font-family: var(--mono); font-size: 11px; color: #6b5f45; margin: 4px 0; }
+    .votos { display: flex; gap: 6px; }
+    .btn-voto { flex: 1; padding: 7px 4px; border: 1px solid var(--tinta); color: var(--tinta); font-family: var(--mono); font-size: 12px; }
+    .btn-voto[aria-pressed="true"] { background: var(--tinta); color: var(--manila); }
+    .aporte { margin-top: 8px; font-size: 13px; position: relative; padding-right: 18px; }
+    .aporte b { font-family: var(--mono); font-size: 11px; }
+    .aporte time { font-family: var(--mono); font-size: 10px; color: #6b5f45; margin-left: 4px; }
+    .expediente .aporte p { margin-top: 2px; font-size: 13px; overflow-wrap: anywhere; }
+    .btn-borrar-com { position: absolute; right: 0; top: 0; color: var(--sello); font-size: 15px; }
+    .txt-aporte { width: 100%; min-height: 54px; margin-top: 10px; padding: 6px; background: rgba(255,255,255,0.35); border: 1px solid var(--tinta); font-family: var(--maquina); font-size: 14px; color: var(--tinta); resize: vertical; }
+    .comunidad .btn-papel { margin-top: 6px; width: 100%; }
+
+    /* Aviso de almacenamiento (primera visita) */
+    #aviso-datos {
+      position: fixed; left: 50%; bottom: 44px; transform: translateX(-50%); z-index: 46;
+      width: 560px; max-width: calc(100vw - 20px); padding: 12px 14px;
+      background: rgba(5,8,10,0.96); border: 1px solid var(--ambar);
+      font-size: 12px; line-height: 1.5; display: none;
+    }
+    #aviso-datos.visible { display: block; }
+    #aviso-datos .acciones { margin-top: 8px; display: flex; gap: 14px; justify-content: flex-end; align-items: center; }
+    #aviso-datos .ver-privacidad { text-decoration: underline; color: var(--tenue); font-size: 12px; }
+    #aviso-datos #aviso-ok { border: 1px solid var(--ambar); padding: 6px 14px; font-weight: 600; }
+
+    /* Aviso de privacidad (dentro de la hoja "Acerca de") */
+    #acerca .hoja.modo-priv > :not(.cerrar):not(#acerca-priv) { display: none !important; }
+    #acerca .hoja:not(.modo-priv) > #acerca-priv { display: none; }
+    #acerca-priv p { font-size: 14px; }
+
+    /* Selector de idioma */
+    #idiomas { display: flex; border: 1px solid var(--linea); }
+    #idiomas button { padding: 8px 10px; font-size: 12px; color: var(--tenue); }
+    #idiomas button[aria-pressed="true"] { background: var(--linea); color: var(--ambar); }
+
+    /* ---------- El globo ---------- */
+    #mapa { position: fixed; inset: 0; }
+    /* Rejilla de "pantalla de radar" encima del globo (no bloquea clics) */
+    #rejilla {
+      position: fixed; inset: 0; z-index: 5; pointer-events: none;
+      background:
+        repeating-linear-gradient(0deg, rgba(242,178,58,0.035) 0 1px, transparent 1px 3px),
+        radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.75) 100%);
+    }
+
+    /* ---------- Panel izquierdo: registro de contactos ---------- */
+    #registro {
+      position: fixed; top: 96px; left: 20px; z-index: 10;
+      width: 230px; padding: 14px 16px;
+      background: rgba(12,19,22,0.88); border: 1px solid var(--linea);
+    }
+    #registro h2 { font-size: 12px; font-weight: 400; color: var(--tenue); margin-bottom: 10px; }
+    #total { font-size: 34px; font-weight: 600; line-height: 1; margin-bottom: 4px; }
+    #modo { font-size: 11px; color: var(--tenue); margin-bottom: 14px; }
+    .filtro {
+      width: 100%; display: flex; align-items: center; gap: 10px;
+      padding: 6px 0; text-align: left; border-top: 1px solid var(--linea);
+    }
+    .filtro .punto { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+    .filtro .n { margin-left: auto; color: var(--tenue); }
+    .filtro[aria-pressed="false"] { opacity: 0.35; }
+    .filtro[aria-pressed="false"] .punto { background: transparent !important; outline: 1px solid currentColor; }
+    #registro .ayuda { margin-top: 10px; font-size: 11px; color: var(--tenue); line-height: 1.4; }
+    #registro { max-height: calc(100vh - 150px); overflow-y: auto; }
+
+    /* Controles segmentados (periodo y vista) */
+    .control { margin-bottom: 12px; }
+    .control .rotulo { font-size: 11px; color: var(--tenue); margin-bottom: 4px; }
+    .segmentos { display: flex; border: 1px solid var(--linea); }
+    .segmentos button { flex: 1; padding: 6px 0; font-size: 12px; color: var(--tenue); }
+    .segmentos button + button { border-left: 1px solid var(--linea); }
+    .segmentos button[aria-pressed="true"] { background: var(--linea); color: var(--ambar); }
+    #btn-reproducir { width: 100%; margin-top: 6px; padding: 6px 0; font-size: 12px; border: 1px solid var(--linea); }
+    #btn-reproducir:hover { border-color: var(--ambar); }
+    #hasta { font-size: 11px; color: var(--ambar); margin-top: 4px; min-height: 14px; }
+
+    /* Zonas activas */
+    #bloque-zonas { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--linea); }
+    #bloque-zonas h2 { margin-bottom: 8px; }
+    #zonas { list-style: none; counter-reset: zona; }
+    #zonas li { counter-increment: zona; }
+    #zonas button { width: 100%; display: grid; grid-template-columns: 18px 1fr auto; gap: 6px; padding: 6px 0; text-align: left; font-size: 12px; line-height: 1.35; }
+    #zonas button::before { content: counter(zona); color: var(--tenue); }
+    #zonas button:hover .z-nombre { text-decoration: underline; }
+    #zonas .z-dato { color: var(--tenue); text-align: right; white-space: nowrap; }
+    #zonas .sube { color: #F97316; }
+    #zonas .vacio { font-size: 11px; color: var(--tenue); }
+
+    /* Etiqueta al final de un corredor proyectado */
+    .proyeccion {
+      font-size: 9px; letter-spacing: 0.12em; color: var(--ambar);
+      padding: 2px 5px; border: 1px dashed var(--ambar); background: rgba(5,8,10,0.75);
+      white-space: nowrap; pointer-events: none;
+    }
+
+    /* Trampa para robots: invisible para las personas */
+    .trampa { position: absolute !important; left: -9999px !important; width: 1px !important; height: 1px !important; opacity: 0 !important; }
+
+    .btn-enlace { margin-top: 10px; font-family: var(--mono); font-size: 12px; color: var(--tinta); text-decoration: underline; }
+
+    /* Formulario por pasos */
+    #pasos { display: flex; gap: 4px; margin: 10px 0 4px; }
+    #pasos span { flex: 1; height: 3px; background: #b9a77c; }
+    #pasos span.hecho { background: var(--tinta); }
+    #paso-titulo { font-family: var(--mono); font-size: 11px; color: #6b5f45; }
+    .paso { border: none; padding: 0; margin: 0; }
+    .paso[hidden] { display: none; }
+    .nav-pasos { display: flex; gap: 8px; margin-top: 20px; }
+    .nav-pasos button { flex: 1; padding: 11px; font-family: var(--mono); font-size: 13px; font-weight: 600; }
+    #btn-atras { background: transparent; border: 1px solid var(--tinta); color: var(--tinta); }
+    #btn-siguiente { background: var(--tinta); color: var(--manila); }
+    #btn-guardar { background: var(--sello); color: #fff; margin-top: 0; }
+
+    /* Grupos de opciones (momento, distancia, duración…) */
+    .opciones { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+    .opciones button {
+      flex: 1 1 auto; min-width: 72px; padding: 9px 8px;
+      border: 1px solid var(--tinta); color: var(--tinta);
+      font-family: var(--mono); font-size: 12px;
+    }
+    .opciones button[aria-checked="true"] { background: var(--tinta); color: var(--manila); }
+    #panel input[type="number"] { width: 90px; }
+    .check-linea { display: flex; gap: 8px; align-items: center; margin-top: 14px; font-family: var(--mono); font-size: 13px; }
+    .check-linea input { width: auto; }
+
+    /* Índice de evidencia */
+    .evidencia-barra { letter-spacing: 2px; }
+    .expediente .sello.neutro { border-color: #6b5f45; color: #6b5f45; }
+
+    /* Brújula del formulario */
+    #brujula { display: grid; grid-template-columns: repeat(3, 52px); gap: 4px; margin-top: 4px; }
+    #brujula button, #dir-nose {
+      height: 40px; border: 1px solid var(--tinta); color: var(--tinta);
+      font-family: var(--mono); font-size: 13px;
+    }
+    #brujula button[aria-checked="true"], #dir-nose[aria-checked="true"] { background: var(--tinta); color: var(--manila); }
+    #dir-nose { margin-top: 6px; width: 164px; height: 32px; font-size: 12px; }
+
+    /* ---------- Lectura de coordenadas del cursor ---------- */
+    #lectura {
+      position: fixed; left: 20px; bottom: 16px; z-index: 10;
+      font-size: 12px; color: var(--tenue);
+    }
+    #lectura b { color: var(--ambar); font-weight: 400; }
+
+    /* ---------- Pins: puntos de radar ---------- */
+    .blip { position: relative; width: 14px; height: 14px; cursor: pointer; }
+    .blip i {
+      position: absolute; inset: 3px; border-radius: 50%;
+      background: var(--c); box-shadow: 0 0 10px var(--c);
+    }
+    .blip::before {         /* anillo exterior */
+      content: ""; position: absolute; inset: -5px; border-radius: 50%;
+      border: 1px solid var(--c); opacity: 0.6;
+    }
+    .blip.nuevo::after {    /* pulso solo en el reporte más reciente */
+      content: ""; position: absolute; inset: -5px; border-radius: 50%;
+      border: 1px solid var(--c);
+      animation: pulso 2s ease-out infinite;
+    }
+    .blip span {
+      position: absolute; left: 20px; top: -2px; white-space: nowrap;
+      font-size: 10px; color: var(--c); text-shadow: 0 0 4px #000, 0 0 2px #000;
+    }
+    @keyframes pulso { from { transform: scale(1); opacity: 0.8; } to { transform: scale(3); opacity: 0; } }
+
+    /* ---------- Papel de expediente (popup y formulario) ---------- */
+    .papel {
+      background-color: var(--manila);
+      /* renglones muy suaves para que parezca papel */
+      background-image: repeating-linear-gradient(transparent 0 23px, rgba(28,26,22,0.06) 23px 24px);
+      color: var(--tinta);
+      font-family: var(--maquina);
+    }
+    .sello {
+      display: inline-block; padding: 3px 10px;
+      border: 2px solid var(--sello); color: var(--sello);
+      font-family: var(--mono); font-weight: 600; font-size: 12px; letter-spacing: 0.15em;
+      transform: rotate(-6deg); opacity: 0.85;
+    }
+    .tachado { background: var(--tinta); color: transparent; user-select: none; padding: 0 2px; }
+
+    .maplibregl-popup-content { padding: 0; border-radius: 0; box-shadow: 0 10px 30px rgba(0,0,0,0.6); }
+    .maplibregl-popup-tip { border-top-color: var(--manila) !important; border-bottom-color: var(--manila) !important; }
+    .maplibregl-popup-close-button { color: var(--tinta); font-size: 20px; padding: 2px 8px; }
+    .expediente { width: 290px; padding: 16px 18px 18px; position: relative; }
+    .expediente .num { font-family: var(--mono); font-size: 11px; color: #6b5f45; }
+    .expediente h3 { font-size: 20px; font-weight: 400; margin: 2px 0 10px; }
+    .expediente dl { display: grid; grid-template-columns: 62px 1fr; gap: 3px 8px; font-size: 13px; }
+    .expediente dt { color: #6b5f45; }
+    .expediente p { margin-top: 10px; font-size: 14px; line-height: 1.45; }
+    .expediente img { width: 100%; margin-top: 10px; display: block; filter: sepia(0.35) contrast(1.05); border: 1px solid #b9a77c; }
+    .expediente .video { position: relative; display: block; }
+    .expediente .video::after {
+      content: attr(data-texto); position: absolute; left: 0; right: 0; bottom: 0;
+      padding: 6px 8px; background: rgba(28,26,22,0.8); color: var(--manila);
+      font-family: var(--mono); font-size: 12px;
+    }
+    .expediente .cabeza { display: flex; justify-content: space-between; align-items: center; padding-right: 22px; margin-bottom: 8px; }
+    .expediente .sello { font-size: 10px; padding: 2px 7px; }
+    .btn-borrar {
+      margin-top: 12px; font-family: var(--mono); font-size: 12px;
+      color: var(--sello); text-decoration: underline;
+    }
+
+    /* ---------- Formulario (carpeta que entra desde la derecha) ---------- */
+    #panel {
+      position: fixed; top: 78px; right: 0; bottom: 0; z-index: 25;
+      width: 420px; max-width: 100%;
+      overflow-y: auto; padding: 22px 24px 28px;
+      border-left: 6px solid #c4ae78;
+      box-shadow: -20px 0 40px rgba(0,0,0,0.6);
+      transform: translateX(105%); transition: transform 0.3s ease;
+    }
+    #panel.abierto { transform: translateX(0); }
+    #panel .encabezado { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
+    #panel .num { font-family: var(--mono); font-size: 11px; color: #6b5f45; }
+    #panel h2 { font-size: 24px; font-weight: 400; margin: 4px 0 4px; }
+    #panel .intro { font-size: 14px; line-height: 1.45; margin-bottom: 8px; }
+
+    #panel label { display: block; margin: 16px 0 4px; font-size: 15px; }
+    #panel input, #panel select, #panel textarea {
+      width: 100%; padding: 6px 2px;
+      background: transparent; border: none; border-bottom: 1px solid var(--tinta);
+      font-family: var(--maquina); font-size: 16px; color: var(--tinta);
+    }
+    #panel input:focus, #panel select:focus, #panel textarea:focus { outline: none; background: rgba(255,255,255,0.35); }
+    #panel input[type="file"] { border: none; font-size: 13px; }
+    #panel textarea { min-height: 80px; resize: vertical; border: 1px solid var(--tinta); padding: 6px; }
+    #panel .ayuda { font-size: 12px; color: #6b5f45; margin-top: 4px; font-family: var(--mono); }
+    .fila { display: flex; gap: 8px; align-items: flex-end; }
+    .fila input { flex: 1; }
+
+    .btn-papel {
+      font-family: var(--mono); font-size: 12px; padding: 7px 10px;
+      border: 1px solid var(--tinta); color: var(--tinta);
+    }
+    .btn-papel:hover { background: var(--tinta); color: var(--manila); }
+    .botones { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+
+    #resultados { list-style: none; margin-top: 6px; }
+    #resultados li { padding: 6px 4px; cursor: pointer; font-size: 14px; border-bottom: 1px dashed #b9a77c; }
+    #resultados li:hover { background: rgba(255,255,255,0.4); }
+    #ubicacion-texto { font-family: var(--mono); font-size: 12px; margin-top: 8px; }
+    #vista-previa, #vista-video { width: 100%; margin-top: 8px; display: none; filter: sepia(0.3); border: 1px solid #b9a77c; }
+
+    #btn-guardar {
+      margin-top: 22px; width: 100%; padding: 12px;
+      background: var(--sello); color: #fff;
+      font-family: var(--mono); font-weight: 600; font-size: 14px; letter-spacing: 0.08em;
+    }
+    #btn-guardar:disabled { opacity: 0.6; cursor: wait; }
+    #btn-cancelar { margin-top: 10px; width: 100%; padding: 8px; font-family: var(--mono); font-size: 12px; color: #6b5f45; text-decoration: underline; }
+    #mensaje { margin-top: 10px; font-family: var(--mono); font-size: 12px; color: var(--sello); }
+
+    #aviso-elegir {
+      position: fixed; bottom: 50px; left: 50%; transform: translateX(-50%); z-index: 15;
+      padding: 10px 18px; border: 1px solid var(--ambar); background: rgba(5,8,10,0.9);
+      display: none;
+    }
+
+    /* ---------- Pantalla de arranque (solo al abrir) ---------- */
+    #arranque {
+      position: fixed; inset: 0; z-index: 100; background: var(--abismo);
+      display: flex; align-items: center; justify-content: center;
+      transition: opacity 0.6s;
+    }
+    #arranque pre { font-family: var(--mono); font-size: 14px; line-height: 1.8; min-width: 340px; }
+    #arranque.fuera { opacity: 0; pointer-events: none; }
+
+    /* Controles de zoom del mapa con el mismo estilo */
+    .maplibregl-ctrl-group { background: var(--consola) !important; border: 1px solid var(--linea); border-radius: 0 !important; }
+    .maplibregl-ctrl-group button + button { border-top: 1px solid var(--linea) !important; }
+    .maplibregl-ctrl-icon { filter: invert(0.75) sepia(1) saturate(4) hue-rotate(-5deg); }
+    .maplibregl-ctrl-attrib { background: rgba(5,8,10,0.7) !important; color: var(--tenue) !important; font-family: var(--mono); font-size: 10px; }
+    .maplibregl-ctrl-attrib a { color: var(--tenue) !important; }
+
+    /* Subimos los controles del mapa para que la insignia de Netlify no los tape */
+    .maplibregl-ctrl-bottom-right { bottom: 52px; }
+
+    /* Botón X del formulario */
+    #panel .encabezado { padding-right: 30px; }
+    #panel .cerrar-panel { position: absolute; top: 8px; right: 12px; font-size: 26px; line-height: 1; color: var(--tinta); }
+
+    /* Selector de foto propio (para poder traducirlo) */
+    #panel input.oculto-visual { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; padding: 0; }
+    #panel label.btn-papel { display: inline-block; margin: 0 8px 0 0; font-size: 12px; cursor: pointer; }
+    #foto:focus-visible + .fila-foto label { outline: 2px solid var(--tinta); outline-offset: 2px; }
+    .fila-foto { display: flex; align-items: center; flex-wrap: wrap; }
+    #foto-nombre { font-family: var(--mono); font-size: 12px; color: #6b5f45; overflow-wrap: anywhere; }
+
+    /* Barra de scroll visible en los expedientes */
+    .expediente { scrollbar-width: thin; scrollbar-color: #8a7a52 transparent; }
+
+    /* Lista y buscador de reportes */
+    #ocultos { font-size: 11px; color: var(--tenue); min-height: 0; }
+    #bloque-lista { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--linea); }
+    #bloque-lista h2 { margin-bottom: 8px; }
+    #buscar-reporte { width: 100%; padding: 6px 8px; background: var(--abismo); border: 1px solid var(--linea); color: var(--ambar); font: inherit; font-size: 12px; }
+    #buscar-reporte::placeholder { color: var(--tenue); }
+    #lista-reportes { list-style: none; max-height: 170px; overflow-y: auto; margin-top: 6px; scrollbar-width: thin; scrollbar-color: var(--linea) transparent; }
+    #lista-reportes button { width: 100%; display: grid; grid-template-columns: 34px 1fr; gap: 6px; padding: 5px 0; text-align: left; font-size: 12px; line-height: 1.35; border-top: 1px solid var(--linea); }
+    #lista-reportes button:hover .l-lugar { text-decoration: underline; }
+    #lista-reportes small { display: block; color: var(--tenue); font-size: 10px; }
+    #lista-reportes .vacio { font-size: 11px; color: var(--tenue); padding: 4px 0; }
+
+    /* Leyenda de las líneas punteadas */
+    .muestra-linea { display: inline-block; width: 26px; border-top: 2px dashed var(--ambar); vertical-align: middle; margin-right: 6px; }
+
+    #btn-plegar { display: none; }
+
+    /* ---------- Celular ---------- */
+    @media (max-width: 700px) {
+      .marca span, #reloj, #lectura, #btn-donar, #btn-acerca, #sesion span { display: none; }
+      header { gap: 10px; padding: 0 10px; }
+      #franja { letter-spacing: 0.12em; }
+      #franja .etiqueta { display: none; }   /* en celular solo "hace 3 h · Lugar" */
+      #pie { left: auto; right: 10px; transform: none; bottom: auto; top: 86px; font-size: 11px; }
+      #pie > span { display: none; }   /* en celular solo quedan los links */
+      header .btn-cuenta { display: none; }
+      body.leyendo #registro { display: none; }   /* al leer un expediente, el panel no estorba */
+      .solo-movil { display: inline; margin-left: 8px; color: var(--ambar) !important; }
+      #aviso-datos { bottom: 0; }
+      #registro { top: auto; bottom: 30px; left: 10px; width: auto; padding: 10px 12px; }
+      #registro h2, #registro .ayuda, #modo, #bloque-zonas, .control .rotulo { display: none; }
+      #registro { max-height: 55vh; width: 230px; }
+      /* Panel plegable: en celular empieza cerrado para no tapar el globo */
+      #btn-plegar { display: block; float: right; margin-left: 12px; padding: 3px 8px; font-size: 12px; border: 1px solid var(--linea); }
+      #registro.plegado { width: auto; }
+      #registro.plegado > :not(#total):not(#btn-plegar) { display: none; }
+      #bloque-lista h2 { display: block; }
+      #total { font-size: 22px; }
+      #panel { top: 78px; }
+    }
+    /* Respeta a quien pidió menos animaciones en su sistema */
+    @media (prefers-reduced-motion: reduce) {
+      .blip.nuevo::after { animation: none; }
+      #panel, #arranque { transition: none; }
+    }
+  </style>
+</head>
+
+<body>
+  <div id="arranque" aria-hidden="true"><pre id="arranque-texto"></pre></div>
+
+  <div id="franja" data-i18n="franja" aria-live="polite">Archivo abierto · sin contactos recientes</div>
+
+  <header>
+    <div class="marca">
+      <strong data-i18n="marca">MIRA</strong>
+      <span data-i18n="agencia">Mapa de Incidentes y Reportes Anómalos</span>
+    </div>
+    <div id="reloj"></div>
+    <button id="btn-cuenta" class="btn-chico btn-cuenta"></button>
+    <button id="btn-acerca" class="btn-chico" data-i18n="btnAcerca">Acerca de</button>
+    <a id="btn-donar" class="btn-chico" target="_blank" rel="noopener" data-i18n="btnDonar" hidden>Apoya al archivo</a>
+    <div id="idiomas" role="group" aria-label="Idioma / Language">
+      <button data-lang="es">ES</button>
+      <button data-lang="en">EN</button>
+    </div>
+    <button id="btn-abrir" data-i18n="btnAbrir">Registrar contacto</button>
+  </header>
+
+  <div id="mapa"></div>
+  <div id="rejilla"></div>
+
+  <!-- Panel de conteo y filtros -->
+  <section id="registro" aria-label="Contactos registrados">
+    <h2 data-i18n="contactos">Contactos registrados</h2>
+    <button id="btn-plegar" aria-controls="registro"></button>
+    <div id="total">0</div>
+    <div id="ocultos"></div>
+    <div id="modo"></div>
+
+    <div class="control">
+      <div class="rotulo" data-i18n="periodo">Periodo</div>
+      <div class="segmentos" id="periodos">
+        <button data-periodo="24h" data-i18n="p24h">24 h</button>
+        <button data-periodo="7d" data-i18n="p7d">7 días</button>
+        <button data-periodo="30d" data-i18n="p30d">30 días</button>
+        <button data-periodo="todo" data-i18n="ptodo">Todo</button>
+      </div>
+      <button id="btn-reproducir" data-i18n="reproducir">▶ Reproducir</button>
+      <div id="hasta" aria-live="polite"></div>
+    </div>
+
+    <div class="control">
+      <div class="rotulo" data-i18n="vista">Vista</div>
+      <div class="segmentos" id="vistas">
+        <button data-vista="radar" data-i18n="radar">Radar</button>
+        <button data-vista="calor" data-i18n="calor">Calor</button>
+      </div>
+    </div>
+
+    <div id="filtros"></div>
+    <p class="ayuda" data-i18n="ayudaFiltros">Toca un tipo para mostrarlo u ocultarlo en el globo.</p>
+
+    <div id="bloque-lista">
+      <h2 data-i18n="listaTitulo">Reportes</h2>
+      <input id="buscar-reporte" type="search" data-i18n-ph="phBuscarReporte" placeholder="Buscar por lugar o tipo">
+      <ul id="lista-reportes"></ul>
+    </div>
+
+    <div id="bloque-zonas">
+      <h2 id="zonas-titulo">Zonas activas</h2>
+      <ol id="zonas"></ol>
+      <p class="ayuda"><span class="muestra-linea" aria-hidden="true"></span><span data-i18n="notaProyeccion"></span></p>
+    </div>
+  </section>
+
+  <div id="lectura">Cursor <b id="cursor">—</b></div>
+  <div id="pie"><span><span data-i18n="pie">Proyecto independiente · Reportes enviados por la comunidad</span> · </span><button id="pie-acerca" data-i18n="masInfo">Más información</button> · <button class="ver-privacidad" data-i18n="privCorto">Privacidad</button><button class="btn-cuenta solo-movil"></button></div>
+  <div id="aviso-datos" role="region" aria-label="Privacidad">
+    <span data-i18n="bannerDatos"></span>
+    <div class="acciones"><button class="ver-privacidad" data-i18n="privTitulo">Aviso de privacidad</button><button id="aviso-ok" data-i18n="entendido">Entendido</button></div>
+  </div>
+  <div id="notificacion" role="status"></div>
+
+  <!-- ===== Acerca de ===== -->
+  <div id="acerca" role="dialog" aria-modal="true" aria-labelledby="acerca-titulo">
+    <div class="hoja papel">
+      <button class="cerrar" id="acerca-cerrar" aria-label="Cerrar">×</button>
+      <div class="num">MIRA-0000</div>
+      <h2 id="acerca-titulo" data-i18n="acercaTitulo">Acerca del archivo</h2>
+      <p data-i18n="acerca1"></p>
+      <p data-i18n="acerca2"></p>
+      <p data-i18n="acerca3"></p>
+      <p data-i18n="acerca4"></p>
+      <p data-i18n="acerca5"></p>
+      <p id="acerca-donar-texto" data-i18n="acerca6" hidden></p>
+      <a id="acerca-donar" class="donar-hoja" target="_blank" rel="noopener" data-i18n="btnDonar" hidden>Apoya al archivo</a>
+      <button class="link-agente ver-privacidad" data-i18n="privTitulo">Aviso de privacidad</button>
+      <div id="acerca-priv">
+        <h2 data-i18n="privTitulo">Aviso de privacidad</h2>
+        <div id="priv-texto"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Acceso de administrador (solo administradores) ===== -->
+  <div id="login" role="dialog" aria-modal="true" aria-labelledby="login-titulo">
+    <div class="hoja papel">
+      <button type="button" class="cerrar" id="login-cerrar" aria-label="Cerrar">×</button>
+
+      <!-- Entrar -->
+      <form id="vista-entrar">
+        <h2 id="login-titulo" data-i18n="entrarTitulo">Entrar al archivo</h2>
+        <p class="nota" data-i18n="entrarIntro"></p>
+        <label for="login-correo" data-i18n="correo">Correo</label>
+        <input id="login-correo" type="email" autocomplete="email" required>
+        <label for="login-clave" data-i18n="contrasena">Contraseña</label>
+        <input id="login-clave" type="password" autocomplete="current-password" required>
+        <button type="submit" class="entrar" data-i18n="entrar">Entrar</button>
+        <p class="enlaces"><button type="button" id="ir-crear" data-i18n="irCrear">Crear una cuenta</button> · <button type="button" id="olvide" data-i18n="olvide">Olvidé mi contraseña</button></p>
+      </form>
+
+      <!-- Crear cuenta -->
+      <form id="vista-crear" hidden>
+        <h2 data-i18n="crearTitulo">Crear cuenta</h2>
+        <label for="reg-alias" data-i18n="alias">Alias público</label>
+        <input id="reg-alias" required minlength="3" maxlength="20" pattern="[A-Za-z0-9_]+" autocomplete="nickname">
+        <p class="nota" data-i18n="aliasAyuda"></p>
+        <label for="reg-correo" data-i18n="correo">Correo</label>
+        <input id="reg-correo" type="email" autocomplete="email" required>
+        <label for="reg-clave" data-i18n="contrasena">Contraseña</label>
+        <input id="reg-clave" type="password" autocomplete="new-password" minlength="8" required>
+        <p class="nota" data-i18n="claveAyuda"></p>
+        <label class="check"><input type="checkbox" id="reg-acepto" required><span><span data-i18n="acepto"></span> <button type="button" class="ver-privacidad" data-i18n="avisoPriv">aviso de privacidad</button></span></label>
+        <button type="submit" class="entrar" data-i18n="crearCuenta">Crear cuenta</button>
+        <p class="enlaces"><button type="button" id="ir-entrar" data-i18n="yaTengo">Ya tengo cuenta</button></p>
+      </form>
+
+      <!-- Sesión iniciada -->
+      <div id="vista-perfil" hidden>
+        <h2 data-i18n="tuCuenta">Tu cuenta</h2>
+        <p class="nota" id="perfil-datos"></p>
+        <a id="link-panel" href="admin.html" class="entrar" data-i18n="panelAdmin" hidden>Panel de administración</a>
+        <button type="button" class="entrar secundario" id="btn-salir" data-i18n="salir">Salir</button>
+        <p class="enlaces"><button type="button" id="btn-eliminar-cuenta" data-i18n="eliminarCuenta">Eliminar mi cuenta</button></p>
+      </div>
+
+      <!-- Nueva contraseña (al volver del correo de recuperación) -->
+      <form id="vista-clave" hidden>
+        <h2 data-i18n="nuevaClave">Nueva contraseña</h2>
+        <label for="clave-nueva" data-i18n="contrasena">Contraseña</label>
+        <input id="clave-nueva" type="password" autocomplete="new-password" minlength="8" required>
+        <button type="submit" class="entrar" data-i18n="guardarClave">Guardar contraseña</button>
+      </form>
+
+      <p id="login-error" role="alert"></p>
+    </div>
+  </div>
+
+  <div id="aviso-elegir" data-i18n="avisoElegir">Toca el globo en el punto del avistamiento</div>
+
+  <!-- ===== Formulario: un expediente en blanco ===== -->
+  <aside id="panel" class="papel" aria-label="Registrar contacto">
+    <button type="button" class="cerrar-panel" id="panel-cerrar" aria-label="Cerrar">×</button>
+    <div class="encabezado">
+      <div>
+        <div class="num" id="num-nuevo">Expediente nuevo</div>
+        <h2 data-i18n="tituloForm">Reporte de avistamiento</h2>
+      </div>
+      <span class="sello" data-i18n="borrador">Borrador</span>
+    </div>
+    <p class="intro" data-i18n="intro">Describe lo que viste con el mayor detalle posible. Todo reporte entra como no verificado hasta que se revise.</p>
+
+    <form id="formulario" novalidate>
+      <!-- Campo trampa: las personas no lo ven; los robots lo llenan -->
+      <input type="text" id="trampa" class="trampa" tabindex="-1" autocomplete="off" aria-hidden="true">
+      <div id="pasos" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+      <p id="paso-titulo"></p>
+
+      <!-- ===== Paso 1: qué viste ===== -->
+      <fieldset class="paso" data-paso="1">
+        <label data-i18n="lblCategoria" for="categoria">Categoría del fenómeno</label>
+        <select id="categoria">
+          <option value="fani" data-i18n="cat_fani">FANI</option>
+          <option value="criptido_alado" data-i18n="cat_criptido_alado">Críptido alado</option>
+          <option value="bestia_atmosferica" data-i18n="cat_bestia_atmosferica">Bestia atmosférica</option>
+          <option value="varillas" data-i18n="cat_varillas">Varillas (rods)</option>
+          <option value="serpiente" data-i18n="cat_serpiente">Serpiente del cielo</option>
+          <option value="sin_clasificar" data-i18n="cat_sin_clasificar">Sin clasificar</option>
+        </select>
+        <p class="ayuda" data-i18n="ayudaCat"></p>
+
+        <label data-i18n="lblForma" for="forma">Forma observada</label>
+        <select id="forma">
+          <option value="" data-i18n="formaNoSe">No estoy seguro</option>
+          <option value="luz" data-i18n="forma_luz">Luz</option>
+          <option value="esfera" data-i18n="forma_esfera">Esfera</option>
+          <option value="disco" data-i18n="forma_disco">Disco</option>
+          <option value="triangulo" data-i18n="forma_triangulo">Triángulo</option>
+          <option value="cilindro" data-i18n="forma_cilindro">Cilindro</option>
+          <option value="ovalo" data-i18n="forma_ovalo">Óvalo</option>
+          <option value="formacion" data-i18n="forma_formacion">Formación</option>
+          <option value="cambiante" data-i18n="forma_cambiante">Cambiante</option>
+          <option value="irregular" data-i18n="forma_irregular">Irregular</option>
+          <option value="otra" data-i18n="forma_otra">Otra</option>
+        </select>
+
+        <label data-i18n="lblDescripcion" for="descripcion">Descripción</label>
+        <textarea id="descripcion" maxlength="1000" data-i18n-ph="phDescripcion" placeholder="Tamaño, color, sonido, hacia dónde se movía…"></textarea>
+      </fieldset>
+
+      <!-- ===== Paso 2: dónde y cuándo ===== -->
+      <fieldset class="paso" data-paso="2" hidden>
+        <label data-i18n="lblUbicacion" for="buscar">Ubicación</label>
+        <div class="fila">
+          <input id="buscar" data-i18n-ph="phBuscar" placeholder="Ciudad, lugar o coordenadas">
+          <button type="button" class="btn-papel" id="btn-buscar" data-i18n="btnBuscar">Buscar</button>
+        </div>
+        <p class="ayuda" data-i18n="ayudaBuscar">Ej. Saltillo, o 25.42, -100.98 (latitud, longitud)</p>
+        <ul id="resultados"></ul>
+        <div class="botones">
+          <button type="button" class="btn-papel" id="btn-elegir" data-i18n="btnElegir">Marcar en el globo</button>
+          <button type="button" class="btn-papel" id="btn-gps" data-i18n="btnGps">Usar mi GPS</button>
+        </div>
+        <div id="ubicacion-texto">Sin coordenadas</div>
+
+        <label data-i18n="lblLugar" for="lugar">Nombre del lugar</label>
+        <input id="lugar" data-i18n-ph="phLugar" placeholder="Se llena al buscar, o escríbelo" maxlength="200">
+
+        <label data-i18n="lblFecha" for="fecha">Fecha y hora del avistamiento</label>
+        <input id="fecha" type="datetime-local">
+
+        <label data-i18n="lblMomento" id="lbl-momento">¿Cuándo fue?</label>
+        <div class="opciones" id="momento" role="radiogroup" aria-labelledby="lbl-momento">
+          <button type="button" role="radio" data-val="dia" data-i18n="mom_dia">De día</button>
+          <button type="button" role="radio" data-val="crepusculo" data-i18n="mom_crepusculo">Al atardecer</button>
+          <button type="button" role="radio" data-val="noche" data-i18n="mom_noche">De noche</button>
+        </div>
+      </fieldset>
+
+      <!-- ===== Paso 3: circunstancias ===== -->
+      <fieldset class="paso" data-paso="3" hidden>
+        <label data-i18n="lblDistancia" id="lbl-distancia">¿A qué distancia?</label>
+        <div class="opciones" id="distancia" role="radiogroup" aria-labelledby="lbl-distancia">
+          <button type="button" role="radio" data-val="lejos" data-i18n="dist_lejos">Más de 150 m</button>
+          <button type="button" role="radio" data-val="cerca" data-i18n="dist_cerca">Menos de 150 m</button>
+        </div>
+        <p class="ayuda" data-i18n="ayudaDistancia"></p>
+
+        <div id="bloque-efecto" hidden>
+          <label data-i18n="lblEfecto" id="lbl-efecto">¿Dejó algo o había alguien?</label>
+          <div class="opciones" id="efecto" role="radiogroup" aria-labelledby="lbl-efecto">
+            <button type="button" role="radio" data-val="ninguno" data-i18n="efe_ninguno">Nada</button>
+            <button type="button" role="radio" data-val="rastro" data-i18n="efe_rastro">Rastro físico</button>
+            <button type="button" role="radio" data-val="ocupante" data-i18n="efe_ocupante">Un ser u ocupante</button>
+          </div>
+        </div>
+
+        <label data-i18n="lblDuracion" id="lbl-duracion">¿Cuánto duró?</label>
+        <div class="opciones" id="duracion" role="radiogroup" aria-labelledby="lbl-duracion">
+          <button type="button" role="radio" data-val="segundos" data-i18n="dur_segundos">Segundos</button>
+          <button type="button" role="radio" data-val="min1a5" data-i18n="dur_min1a5">1 a 5 min</button>
+          <button type="button" role="radio" data-val="min5a30" data-i18n="dur_min5a30">5 a 30 min</button>
+          <button type="button" role="radio" data-val="mas30" data-i18n="dur_mas30">Más de 30 min</button>
+        </div>
+
+        <label data-i18n="lblTestigos" for="testigos">¿Cuántas personas lo vieron?</label>
+        <input id="testigos" type="number" min="1" max="999" value="1">
+
+        <label data-i18n="lblDireccion" id="lbl-direccion">¿Hacia dónde se movía?</label>
+        <div id="brujula" role="radiogroup" aria-labelledby="lbl-direccion">
+          <button type="button" role="radio" data-dir="NW"></button>
+          <button type="button" role="radio" data-dir="N"></button>
+          <button type="button" role="radio" data-dir="NE"></button>
+          <button type="button" role="radio" data-dir="W"></button>
+          <button type="button" role="radio" data-dir="estacionario"></button>
+          <button type="button" role="radio" data-dir="E"></button>
+          <button type="button" role="radio" data-dir="SW"></button>
+          <button type="button" role="radio" data-dir="S"></button>
+          <button type="button" role="radio" data-dir="SE"></button>
+        </div>
+        <button type="button" id="dir-nose" role="radio" data-dir="" aria-checked="true" data-i18n="noSe">No sé</button>
+      </fieldset>
+
+      <!-- ===== Paso 4: evidencia ===== -->
+      <fieldset class="paso" data-paso="4" hidden>
+        <label data-i18n="lblFoto" for="foto">Fotografía</label>
+        <input id="foto" type="file" accept="image/*" class="oculto-visual">
+        <div class="fila-foto"><label for="foto" class="btn-papel" data-i18n="elegirFoto">Elegir foto</label><span id="foto-nombre"></span></div>
+        <p class="ayuda" data-i18n="ayudaFoto">No subas fotos donde se vean caras de personas, placas de autos o tu casa.</p>
+        <img id="vista-previa" alt="Vista previa de la fotografía">
+
+        <label data-i18n="lblYoutube" for="youtube">Video en YouTube</label>
+        <input id="youtube" placeholder="https://youtu.be/…">
+        <p class="ayuda" data-i18n="ayudaYoutube">Opcional. Sube tu video a YouTube y pega el link.</p>
+        <img id="vista-video" alt="Miniatura del video">
+
+        <label class="check-linea"><input type="checkbox" id="radar"><span data-i18n="lblRadar">Apareció también en un radar</span></label>
+      </fieldset>
+
+      <div class="nav-pasos">
+        <button type="button" id="btn-atras" data-i18n="atras" hidden>Atrás</button>
+        <button type="button" id="btn-siguiente" data-i18n="siguiente">Siguiente</button>
+        <button type="submit" id="btn-guardar" data-i18n="btnGuardar" hidden>Archivar reporte</button>
+      </div>
+      <button type="button" id="btn-cancelar" data-i18n="btnCancelar">Descartar borrador</button>
+      <p id="mensaje" role="alert"></p>
+    </form>
+  </aside>
+
+  <script>
+    // =========================================================
+    // IDIOMAS: todos los textos de la interfaz en español e inglés
+    // =========================================================
+    // Para agregar otro idioma (ej. portugués), copia el bloque "en",
+    // cámbiale el nombre a "pt", traduce los textos y agrega un botón
+    // <button data-lang="pt">PT</button> en el encabezado.
+    const TEXTOS = {
+      es: {
+        tituloPagina: "MIRA — Mapa de Incidentes y Reportes Anómalos",
+        franja: "Archivo abierto · sin contactos recientes",
+        ultimoContacto: "Último contacto",
+        marca: "MIRA",
+        agencia: "Mapa de Incidentes y Reportes Anómalos",
+        btnAbrir: "Registrar contacto",
+        contactos: "Contactos registrados",
+        ayudaFiltros: "Toca un tipo para mostrarlo u ocultarlo en el globo.",
+        modoNube: "Enlace en línea activo",
+        modoLocal: "Archivo local (solo este navegador)",
+        sinEnlace: "Sin enlace: ",
+        avisoElegir: "Toca el globo en el punto del avistamiento",
+        tituloForm: "Reporte de avistamiento",
+        borrador: "Borrador",
+        intro: "Describe lo que viste con el mayor detalle posible. Todo reporte entra como no verificado hasta que se revise.",
+        lblCategoria: "Categoría del fenómeno",
+        lblUbicacion: "Ubicación",
+        lblLugar: "Nombre del lugar",
+        lblFecha: "Fecha y hora del avistamiento",
+        lblDescripcion: "Descripción",
+        lblFoto: "Fotografía",
+        lblYoutube: "Video en YouTube",
+        cat_fani: "FANI", cat_criptido_alado: "Críptido alado", cat_bestia_atmosferica: "Bestia atmosférica",
+        cat_varillas: "Varillas (rods)", cat_serpiente: "Serpiente del cielo", cat_sin_clasificar: "Sin clasificar",
+        cod_fani: "FANI", cod_criptido_alado: "CA", cod_bestia_atmosferica: "BA",
+        cod_varillas: "VAR", cod_serpiente: "SER", cod_sin_clasificar: "SC",
+        ayudaCat: "FANI = Fenómeno Aéreo No Identificado, el término que usan hoy la NASA y el Departamento de Defensa.",
+        lblForma: "Forma observada",
+        forma_luz: "Luz", forma_esfera: "Esfera", forma_disco: "Disco", forma_triangulo: "Triángulo",
+        forma_cilindro: "Cilindro", forma_ovalo: "Óvalo", forma_formacion: "Formación",
+        forma_cambiante: "Cambiante", forma_irregular: "Irregular", forma_otra: "Otra",
+        formaNoSe: "No estoy seguro",
+        lblMomento: "¿Cuándo fue?",
+        mom_dia: "De día", mom_crepusculo: "Al atardecer", mom_noche: "De noche",
+        lblDistancia: "¿A qué distancia?",
+        dist_lejos: "Más de 150 m", dist_cerca: "Menos de 150 m",
+        ayudaDistancia: "Los 150 metros son el límite que usa la escala de Hynek para separar un avistamiento lejano de un encuentro cercano.",
+        lblEfecto: "¿Dejó algo o había alguien?",
+        efe_ninguno: "Nada", efe_rastro: "Rastro físico", efe_ocupante: "Un ser u ocupante",
+        lblDuracion: "¿Cuánto duró?",
+        dur_segundos: "Segundos", dur_min1a5: "1 a 5 min", dur_min5a30: "5 a 30 min", dur_mas30: "Más de 30 min",
+        lblTestigos: "¿Cuántas personas lo vieron?",
+        lblRadar: "Apareció también en un radar",
+        aproximado: "Zona aproximada",
+        copiarEnlace: "Copiar enlace del caso", enlaceCopiado: "Enlace copiado.",
+        hynek: "Clasificación",
+        hy_de: "Avistamiento lejano", hy_de1: "Luz nocturna", hy_de2: "Disco diurno", hy_de3: "Radar-visual",
+        hy_ec1: "Encuentro cercano", hy_ec2: "Encuentro cercano con rastro", hy_ec3: "Encuentro cercano con ocupante",
+        forma: "Forma", duracion: "Duración", testigos: "Testigos",
+        evidencia: "Evidencia", explicaEvidencia: "Sube un punto por cada respaldo: foto, video, rastro físico, radar y número de testigos. Mide el respaldo del caso, no si es verdad.",
+        paso: "Paso", de: "de",
+        pasoQue: "Qué viste", pasoDonde: "Dónde y cuándo", pasoComo: "Circunstancias", pasoEvidencia: "Evidencia",
+        siguiente: "Siguiente", atras: "Atrás",
+        faltaDescripcion: "Describe lo que viste.",
+        faltaLugar: "Escribe el nombre del lugar.",
+        faltaFecha: "Pon la fecha y la hora.",
+        faltaMomento: "Elige si fue de día, al atardecer o de noche.",
+        faltaDistancia: "Elige a qué distancia estaba.",
+        faltaEfecto: "Elige si dejó un rastro o había alguien.",
+        phBuscar: "Ciudad, lugar o coordenadas",
+        phLugar: "Se llena al buscar, o escríbelo",
+        phDescripcion: "Tamaño, color, sonido, hacia dónde se movía…",
+        btnBuscar: "Buscar",
+        ayudaBuscar: "Ej. Saltillo, o 25.42, -100.98 (latitud, longitud)",
+        btnElegir: "Marcar en el globo",
+        btnGps: "Usar mi GPS",
+        sinCoordenadas: "Sin coordenadas",
+        coordFijadas: "Coordenadas fijadas: ",
+        ayudaYoutube: "Opcional. Sube tu video a YouTube y pega el link.",
+        btnGuardar: "Archivar reporte",
+        guardando: "Archivando…",
+        btnCancelar: "Descartar borrador",
+        expNuevo: "NUEVO",
+        nuevo: "NUEVO",
+        buscando: "Buscando…",
+        sinResultados: "Sin resultados. Prueba con otro nombre o con coordenadas.",
+        errorBuscar: "No se pudo buscar. Revisa tu conexión a internet.",
+        sinGps: "Este navegador no tiene GPS.",
+        obteniendoGps: "Obteniendo tu ubicación…",
+        gpsBloqueado: "El GPS está bloqueado (pasa al abrir como archivo). Busca el lugar o márcalo en el globo.",
+        faltanCoord: "Faltan las coordenadas: busca el lugar o márcalo en el globo.",
+        noYoutube: "Ese link no es de YouTube. Revisa que lo copiaste completo.",
+        sinEspacio: "No hay espacio en el navegador. Prueba sin foto.",
+        limiteEnvios: "Enviaste varios casos en poco tiempo. Espera un rato e inténtalo de nuevo.",
+        errorFoto: "No se pudo subir la foto: ",
+        errorGuardar: "No se pudo archivar: ",
+        lugar: "Lugar", fecha: "Fecha", coord: "Coord.", testigo: "Testigo",
+        nombreReservado: "Nombre reservado",
+        verVideo: "▶  Ver video",
+        destruir: "Destruir expediente",
+        confirmarDestruir: "¿Destruir este expediente? No se puede deshacer.",
+        en: "en",
+        estados: { "pendiente": "PENDIENTE", "no_identificado": "NO IDENTIFICADO", "ifo": "IFO · IDENTIFICADO", "datos_insuficientes": "DATOS INSUFICIENTES", "descartado": "DESCARTADO" },
+        lblDireccion: "¿Hacia dónde se movía?",
+        noSe: "No sé",
+        quieto: "Quieto",
+        rumbo: "Rumbo",
+        dirs: { N: "N", NE: "NE", E: "E", SE: "SE", S: "S", SW: "SO", W: "O", NW: "NO" },
+        periodo: "Periodo", p24h: "24 h", p7d: "7 días", p30d: "30 días", ptodo: "Todo",
+        reproducir: "▶ Reproducir", detener: "■ Detener", hasta: "Hasta ",
+        vista: "Vista", radar: "Radar", calor: "Calor",
+        zonasActivas: "Oleadas",
+        sinZonas: "Todavía no hay casos en este periodo.",
+        sinPorFiltro: "Sin resultados con los filtros actuales.",
+        ocultos: " ocultos por filtro de tipo",
+        listaTitulo: "Reportes", phBuscarReporte: "Buscar por lugar o tipo",
+        sinCoincidencias: "Ningún reporte coincide con la búsqueda.",
+        elegirFoto: "Elegir foto", sinFoto: "Ninguna foto elegida",
+        creditos: "Imágenes © Esri · Búsqueda: Photon/OpenStreetMap",
+        abrirFiltros: "Filtros ▴", cerrarFiltros: "Ocultar ▾",
+        tendSube: "en aumento", tendBaja: "a la baja", tendIgual: "estable", tendNueva: "nueva",
+        notaProyeccion: "Las líneas punteadas son proyecciones especulativas: siguen el rumbo promedio reportado en cada zona. No predicen nada.",
+        proyeccion: "PROYECCIÓN ESPECULATIVA",
+        accesoAgentes: "Acceso de administrador",
+        correo: "Correo", contrasena: "Contraseña", entrar: "Entrar", entrando: "Verificando…",
+        salir: "Salir", agenteActivo: "Admin en sesión",
+        errorLogin: "Correo o contraseña incorrectos.",
+        noEsAdmin: "Esta cuenta no tiene permisos de administrador.",
+        sinNube: "Las cuentas solo funcionan con la base de datos en línea.",
+        eliminarExp: "Eliminar expediente",
+        confirmarEliminar: "¿Eliminar este expediente y su fotografía para siempre? No se puede deshacer.",
+        eliminado: "Expediente eliminado.",
+        errorEliminar: "No se pudo eliminar: ",
+        horaLocal: "hora local",
+        entrarTitulo: "Entrar al archivo",
+        entrarIntro: "Con una cuenta puedes votar y aportar en los reportes. Para enviar un reporte no necesitas cuenta.",
+        irCrear: "Crear una cuenta", olvide: "Olvidé mi contraseña",
+        crearTitulo: "Crear cuenta", alias: "Alias público",
+        aliasAyuda: "De 3 a 20 letras, números o guion bajo. Es lo único que verán los demás: tu correo nunca se muestra.",
+        claveAyuda: "Mínimo 8 caracteres. Se guarda cifrada: nadie puede verla, ni el administrador.",
+        acepto: "Soy mayor de 18 años y acepto el", avisoPriv: "aviso de privacidad",
+        privCorto: "Privacidad", privTitulo: "Aviso de privacidad",
+        crearCuenta: "Crear cuenta", yaTengo: "Ya tengo cuenta",
+        tuCuenta: "Tu cuenta", sesionComo: "Sesión iniciada como ",
+        panelAdmin: "Panel de administración",
+        eliminarCuenta: "Eliminar mi cuenta",
+        confirmarEliminarCuenta: "¿Eliminar tu cuenta, tus votos y tus aportes para siempre? No se puede deshacer.",
+        cuentaEliminada: "Tu cuenta fue eliminada.", errorGeneral: "No se pudo completar: ",
+        nuevaClave: "Nueva contraseña", guardarClave: "Guardar contraseña", claveGuardada: "Contraseña actualizada.",
+        aliasOcupado: "Ese alias ya está en uso o no está permitido. Prueba con otro.",
+        yaRegistrado: "Ese correo ya tiene cuenta. Intenta entrar.",
+        confirmaCorreo: "Te enviamos un correo. Ábrelo y toca el enlace para activar tu cuenta.",
+        escribeCorreo: "Escribe tu correo arriba y vuelve a tocar este enlace.",
+        correoEnviado: "Si ese correo tiene cuenta, recibirás un enlace para cambiar tu contraseña.",
+        bienvenido: "Sesión iniciada: ", sesionCerrada: "Sesión cerrada.",
+        pedirAlias: "Elige un alias público (3 a 20 letras, números o _):",
+        queOpinas: "¿Qué opinas de este reporte?", votoReal: "Parece real", votoFalso: "Parece falso",
+        aportes: "Aportes de la comunidad", sinAportes: "Nadie ha aportado todavía.",
+        phAporte: "¿Viste lo mismo? ¿Sabes qué pudo ser?", enviarAporte: "Enviar aporte",
+        entraParaOpinar: "Entra para votar y aportar", cargando: "Cargando…",
+        errorComunidad: "No se pudieron cargar los votos y aportes.",
+        aporteCorto: "Escribe al menos 3 letras.", confirmarBorrarAporte: "¿Borrar este aporte?",
+        bannerDatos: "Este sitio no usa cookies de publicidad ni de rastreo. Solo guarda en tu navegador tu idioma y, si creas una cuenta, tu sesión.",
+        entendido: "Entendido",
+        contactoKofi: "la página de Ko-fi del proyecto",
+        privacidad: [
+          ["Responsable.", "DARKOM, creador de MIRA (Mapa de Incidentes y Reportes Anómalos), un proyecto personal e independiente. Contacto: {contacto}."],
+          ["Qué datos se guardan.", "Si envías un caso: la ubicación redondeada a un kilómetro aproximadamente (nunca el punto exacto), la fecha, tu descripción, la foto y el link de video. Para frenar el spam se guarda una huella irreversible de tu dirección IP durante 7 días, no la dirección. Si creas una cuenta: tu correo, tu alias, tu contraseña (cifrada, nadie puede leerla), tus votos y tus aportes."],
+          ["Para qué.", "Para publicar los reportes, permitir que la comunidad vote y aporte, y evitar abusos. Tus datos no se venden ni se usan para publicidad."],
+          ["Qué es público.", "Los casos publicados, con su zona aproximada y nunca con coordenadas exactas, tu alias y tus aportes. Tu correo nunca se muestra a otras personas."],
+          ["Dónde se guardan.", "En Supabase (base de datos y fotos, en servidores fuera de México) y Netlify (la página). Al cargar el sitio, tu navegador también se conecta a Esri (mapa), Google Fonts (tipografías), unpkg y jsDelivr (librerías), Photon (búsqueda de lugares) y YouTube (miniaturas de video); esos servicios reciben tu dirección IP."],
+          ["Cookies y almacenamiento.", "No se usan cookies de publicidad ni de rastreo. En tu navegador solo se guarda tu idioma, que ya viste este aviso y, si entras con tu cuenta, tu sesión."],
+          ["Tus derechos.", "Los casos publicados se conservan mientras el archivo exista, porque son el archivo; la huella de tu IP se borra sola a los 7 días. Puedes pedir acceso, corrección o eliminación de tus datos. El botón «Eliminar mi cuenta» borra tu cuenta, tus votos y tus aportes al instante. Para borrar un caso que enviaste, escribe al contacto."],
+          ["Edad.", "Las cuentas son para personas mayores de 18 años."],
+          ["Cambios.", "Si este aviso cambia, se publicará aquí. Última actualización: noviembre de 2026."]
+        ],
+        dictamen: "Dictamen",
+        btnAcerca: "Acerca de",
+        btnDonar: "Apoya al archivo",
+        pie: "Proyecto independiente · Reportes enviados por la comunidad",
+        masInfo: "Más información",
+        ayudaFoto: "No subas fotos donde se vean caras de personas, placas de autos o tu casa.",
+        recibido: "Reporte recibido. Será revisado antes de publicarse en el archivo.",
+        acercaTitulo: "Acerca del archivo",
+        acerca1: "Soy DARKOM, un entusiasta de los fenómenos que se ven en el cielo. MIRA —Mapa de Incidentes y Reportes Anómalos— es mi proyecto personal: aquí reúno y publico lo que la gente ve sobre el norte de México y el sur de Estados Unidos.",
+        acerca2: "MIRA no investiga ni concluye: pone en el mapa lo que la gente reporta y lo deja abierto para que la comunidad opine. El estilo de terminal y expediente es gusto mío; los reportes son de verdad.",
+        acerca3: "Los reportes los envía la comunidad. Antes de publicarlos los reviso uno por uno para quitar contenido ofensivo, falso o repetido. Que un reporte esté publicado no significa que esté confirmado.",
+        acerca4: "Cuando encuentro qué era (un dron, un satélite, un globo, un avión), marco el expediente como Explicado y escribo el dictamen. Los que nadie ha podido explicar quedan como Sin explicar.",
+        acerca5: "Tu privacidad: para enviar un reporte no pido tu nombre ni tu correo. Si creas una cuenta para votar o aportar, los demás solo ven tu alias. La foto, el video y la zona aproximada que envíes serán públicos; las coordenadas se redondean a un kilómetro para que nadie pueda ubicar tu casa. Aun así, evita mostrar caras o placas.",
+        acerca6: "Mantengo el archivo en línea con mi tiempo y con el apoyo de la comunidad. Si te gusta el proyecto, tu apoyo ayuda a pagar el servidor.",
+        arranque: [
+          "> Estableciendo enlace satelital ........ OK",
+          "> Descifrando el archivo MIRA .......... OK",
+          "> Verificando credenciales .............. OK",
+          "> Acceso concedido."
+        ],
+        locale: "es-MX"
+      },
+      en: {
+        tituloPagina: "MIRA — Map of Incidents & Reported Anomalies",
+        franja: "Open archive · no recent contacts",
+        ultimoContacto: "Last contact",
+        marca: "MIRA",
+        agencia: "Map of Incidents & Reported Anomalies",
+        btnAbrir: "Log a sighting",
+        contactos: "Logged contacts",
+        ayudaFiltros: "Tap a type to show or hide it on the globe.",
+        modoNube: "Online link active",
+        modoLocal: "Local archive (this browser only)",
+        sinEnlace: "No link: ",
+        avisoElegir: "Tap the globe where the sighting happened",
+        tituloForm: "Sighting report",
+        borrador: "Draft",
+        intro: "Describe what you saw in as much detail as you can. Every report starts as unverified until it is reviewed.",
+        lblCategoria: "Phenomenon category",
+        lblUbicacion: "Location",
+        lblLugar: "Place name",
+        lblFecha: "Date and time of sighting",
+        lblDescripcion: "Description",
+        lblFoto: "Photo",
+        lblYoutube: "YouTube video",
+        cat_fani: "UAP", cat_criptido_alado: "Winged cryptid", cat_bestia_atmosferica: "Atmospheric beast",
+        cat_varillas: "Rods", cat_serpiente: "Sky serpent", cat_sin_clasificar: "Unclassified",
+        cod_fani: "UAP", cod_criptido_alado: "WC", cod_bestia_atmosferica: "AB",
+        cod_varillas: "ROD", cod_serpiente: "SKS", cod_sin_clasificar: "UNC",
+        ayudaCat: "UAP = Unidentified Anomalous Phenomena, the term NASA and the Department of Defense use today.",
+        lblForma: "Observed shape",
+        forma_luz: "Light", forma_esfera: "Sphere", forma_disco: "Disc", forma_triangulo: "Triangle",
+        forma_cilindro: "Cylinder", forma_ovalo: "Oval", forma_formacion: "Formation",
+        forma_cambiante: "Changing", forma_irregular: "Irregular", forma_otra: "Other",
+        formaNoSe: "Not sure",
+        lblMomento: "When was it?",
+        mom_dia: "Daytime", mom_crepusculo: "At dusk", mom_noche: "At night",
+        lblDistancia: "How far away?",
+        dist_lejos: "Over 150 m", dist_cerca: "Under 150 m",
+        ayudaDistancia: "150 metres is the limit Hynek's scale uses to separate a distant sighting from a close encounter.",
+        lblEfecto: "Did it leave anything, or was someone there?",
+        efe_ninguno: "Nothing", efe_rastro: "Physical trace", efe_ocupante: "A being or occupant",
+        lblDuracion: "How long did it last?",
+        dur_segundos: "Seconds", dur_min1a5: "1 to 5 min", dur_min5a30: "5 to 30 min", dur_mas30: "Over 30 min",
+        lblTestigos: "How many people saw it?",
+        lblRadar: "It also showed up on radar",
+        aproximado: "Approximate area",
+        copiarEnlace: "Copy case link", enlaceCopiado: "Link copied.",
+        hynek: "Classification",
+        hy_de: "Distant sighting", hy_de1: "Nocturnal light", hy_de2: "Daylight disc", hy_de3: "Radar-visual",
+        hy_ec1: "Close encounter", hy_ec2: "Close encounter with trace", hy_ec3: "Close encounter with occupant",
+        forma: "Shape", duracion: "Duration", testigos: "Witnesses",
+        evidencia: "Evidence", explicaEvidencia: "One point per piece of support: photo, video, physical trace, radar and witness count. It measures how documented the case is, not whether it's true.",
+        paso: "Step", de: "of",
+        pasoQue: "What you saw", pasoDonde: "Where and when", pasoComo: "Circumstances", pasoEvidencia: "Evidence",
+        siguiente: "Next", atras: "Back",
+        faltaDescripcion: "Describe what you saw.",
+        faltaLugar: "Write the name of the place.",
+        faltaFecha: "Set the date and time.",
+        faltaMomento: "Choose whether it was day, dusk or night.",
+        faltaDistancia: "Choose how far away it was.",
+        faltaEfecto: "Choose whether it left a trace or someone was there.",
+        phBuscar: "City, place or coordinates",
+        phLugar: "Filled in when you search, or type it",
+        phDescripcion: "Size, color, sound, which way it moved…",
+        btnBuscar: "Search",
+        ayudaBuscar: "E.g. El Paso, or 31.76, -106.48 (latitude, longitude)",
+        btnElegir: "Mark on the globe",
+        btnGps: "Use my GPS",
+        sinCoordenadas: "No coordinates yet",
+        coordFijadas: "Coordinates set: ",
+        ayudaYoutube: "Optional. Upload your video to YouTube and paste the link.",
+        btnGuardar: "File report",
+        guardando: "Filing…",
+        btnCancelar: "Discard draft",
+        expNuevo: "NEW",
+        nuevo: "NEW",
+        buscando: "Searching…",
+        sinResultados: "No results. Try another name or coordinates.",
+        errorBuscar: "Search failed. Check your internet connection.",
+        sinGps: "This browser has no GPS.",
+        obteniendoGps: "Getting your location…",
+        gpsBloqueado: "GPS is blocked (this happens when opened as a file). Search for the place or mark it on the globe.",
+        faltanCoord: "Coordinates missing: search for the place or mark it on the globe.",
+        noYoutube: "That isn't a YouTube link. Check that you copied all of it.",
+        sinEspacio: "The browser is out of space. Try without a photo.",
+        limiteEnvios: "You've sent several cases in a short time. Wait a while and try again.",
+        errorFoto: "The photo couldn't be uploaded: ",
+        errorGuardar: "The report couldn't be filed: ",
+        lugar: "Place", fecha: "Date", coord: "Coord.", testigo: "Witness",
+        nombreReservado: "Name withheld",
+        verVideo: "▶  Watch video",
+        destruir: "Destroy file",
+        confirmarDestruir: "Destroy this file? This can't be undone.",
+        en: "in",
+        estados: { "pendiente": "PENDING", "no_identificado": "UNIDENTIFIED", "ifo": "IFO · IDENTIFIED", "datos_insuficientes": "INSUFFICIENT DATA", "descartado": "DISCARDED" },
+        lblDireccion: "Which way was it moving?",
+        noSe: "Not sure",
+        quieto: "Hovering",
+        rumbo: "Heading",
+        dirs: { N: "N", NE: "NE", E: "E", SE: "SE", S: "S", SW: "SW", W: "W", NW: "NW" },
+        periodo: "Period", p24h: "24 h", p7d: "7 days", p30d: "30 days", ptodo: "All",
+        reproducir: "▶ Replay", detener: "■ Stop", hasta: "Up to ",
+        vista: "View", radar: "Radar", calor: "Heat",
+        zonasActivas: "Sighting waves",
+        sinZonas: "No cases in this period yet.",
+        sinPorFiltro: "No results with the current filters.",
+        ocultos: " hidden by type filter",
+        listaTitulo: "Reports", phBuscarReporte: "Search by place or type",
+        sinCoincidencias: "No report matches the search.",
+        elegirFoto: "Choose photo", sinFoto: "No photo chosen",
+        creditos: "Imagery © Esri · Search: Photon/OpenStreetMap",
+        abrirFiltros: "Filters ▴", cerrarFiltros: "Hide ▾",
+        tendSube: "rising", tendBaja: "falling", tendIgual: "steady", tendNueva: "new",
+        notaProyeccion: "Dashed lines are speculative projections: they follow the average heading reported in each zone. They don't predict anything.",
+        proyeccion: "SPECULATIVE PROJECTION",
+        accesoAgentes: "Admin access",
+        correo: "Email", contrasena: "Password", entrar: "Sign in", entrando: "Checking…",
+        salir: "Sign out", agenteActivo: "Admin signed in",
+        errorLogin: "Wrong email or password.",
+        noEsAdmin: "This account doesn't have admin permissions.",
+        sinNube: "Accounts only work with the online database.",
+        eliminarExp: "Delete file",
+        confirmarEliminar: "Delete this file and its photo forever? This can't be undone.",
+        eliminado: "File deleted.",
+        errorEliminar: "Couldn't delete: ",
+        horaLocal: "local time",
+        entrarTitulo: "Sign in to the archive",
+        entrarIntro: "With an account you can vote and contribute on reports. You don't need one to send a report.",
+        irCrear: "Create an account", olvide: "Forgot my password",
+        crearTitulo: "Create account", alias: "Public alias",
+        aliasAyuda: "3 to 20 letters, numbers or underscores. It's the only thing others see: your email is never shown.",
+        claveAyuda: "At least 8 characters. It's stored encrypted: nobody can see it, not even the admin.",
+        acepto: "I'm over 18 and I accept the", avisoPriv: "privacy notice",
+        privCorto: "Privacy", privTitulo: "Privacy notice",
+        crearCuenta: "Create account", yaTengo: "I already have an account",
+        tuCuenta: "Your account", sesionComo: "Signed in as ",
+        panelAdmin: "Admin panel",
+        eliminarCuenta: "Delete my account",
+        confirmarEliminarCuenta: "Delete your account, votes and contributions forever? This can't be undone.",
+        cuentaEliminada: "Your account was deleted.", errorGeneral: "Couldn't complete: ",
+        nuevaClave: "New password", guardarClave: "Save password", claveGuardada: "Password updated.",
+        aliasOcupado: "That alias is taken or not allowed. Try another.",
+        yaRegistrado: "That email already has an account. Try signing in.",
+        confirmaCorreo: "We sent you an email. Open it and tap the link to activate your account.",
+        escribeCorreo: "Type your email above and tap this link again.",
+        correoEnviado: "If that email has an account, you'll get a link to change your password.",
+        bienvenido: "Signed in: ", sesionCerrada: "Signed out.",
+        pedirAlias: "Choose a public alias (3 to 20 letters, numbers or _):",
+        queOpinas: "What do you think of this report?", votoReal: "Looks real", votoFalso: "Looks fake",
+        aportes: "Community contributions", sinAportes: "Nobody has contributed yet.",
+        phAporte: "Did you see it too? Know what it could be?", enviarAporte: "Send contribution",
+        entraParaOpinar: "Sign in to vote and contribute", cargando: "Loading…",
+        errorComunidad: "Votes and contributions couldn't be loaded.",
+        aporteCorto: "Write at least 3 letters.", confirmarBorrarAporte: "Delete this contribution?",
+        bannerDatos: "This site uses no advertising or tracking cookies. It only stores your language in your browser and, if you create an account, your session.",
+        entendido: "Got it",
+        contactoKofi: "the project's Ko-fi page",
+        privacidad: [
+          ["Who is responsible.", "DARKOM, creator of MIRA (Map of Incidents & Reported Anomalies), a personal, independent project. Contact: {contacto}."],
+          ["What is stored.", "If you send a case: the location rounded to about one kilometre (never the exact point), the date, your description, the photo and the video link. To stop spam, an irreversible fingerprint of your IP address is kept for 7 days, not the address itself. If you create an account: your email, your alias, your password (encrypted, nobody can read it), your votes and your contributions."],
+          ["What for.", "To publish reports, let the community vote and contribute, and prevent abuse. Your data is not sold or used for advertising."],
+          ["What is public.", "Published cases, with their approximate area and never exact coordinates, your alias and your contributions. Your email is never shown to others."],
+          ["Where it is stored.", "On Supabase (database and photos, on servers outside Mexico) and Netlify (the page). When the site loads, your browser also connects to Esri (map), Google Fonts (typefaces), unpkg and jsDelivr (libraries), Photon (place search) and YouTube (video thumbnails); those services receive your IP address."],
+          ["Cookies and storage.", "No advertising or tracking cookies are used. Your browser only stores your language, that you've seen this notice and, if you sign in, your session."],
+          ["Your rights.", "Published cases are kept for as long as the archive exists, because they are the archive; your IP fingerprint deletes itself after 7 days. You can ask to access, correct or delete your data. The “Delete my account” button removes your account, votes and contributions instantly. To delete a case you sent, write to the contact."],
+          ["Age.", "Accounts are for people over 18."],
+          ["Changes.", "If this notice changes, it will be published here. Last updated: November 2026."]
+        ],
+        dictamen: "Finding",
+        btnAcerca: "About",
+        btnDonar: "Support the archive",
+        pie: "Independent project · Reports submitted by the community",
+        masInfo: "Learn more",
+        ayudaFoto: "Don't upload photos showing people's faces, license plates or your home.",
+        recibido: "Report received. It will be reviewed before it's published to the archive.",
+        acercaTitulo: "About the archive",
+        acerca1: "I'm DARKOM, an enthusiast of the things people see in the sky. MIRA —Map of Incidents & Reported Anomalies— is my personal project: here I collect and publish what people see over northern Mexico and the southern United States.",
+        acerca2: "MIRA doesn't investigate or conclude: it puts what people report on the map and leaves it open for the community to weigh in. The terminal-and-case-file look is just my taste; the reports are real.",
+        acerca3: "Reports are sent by the community. Before publishing I review them one by one to remove offensive, false or duplicate content. A published report is not a confirmed one.",
+        acerca4: "When I find out what it was (a drone, a satellite, a balloon, a plane), I mark the file as Explained and write down the finding. Those nobody has explained stay Unexplained.",
+        acerca5: "Your privacy: sending a report doesn't require your name or email. If you create an account to vote or contribute, others only see your alias. The photo, video and approximate area you send will be public; coordinates are rounded to about a kilometre so nobody can pinpoint your home. Even so, avoid showing faces or license plates.",
+        acerca6: "I keep the archive online with my own time and the community's support. If you enjoy the project, your support helps pay for the server.",
+        arranque: [
+          "> Establishing satellite link .......... OK",
+          "> Decrypting the MIRA archive ......... OK",
+          "> Checking credentials ................. OK",
+          "> Access granted."
+        ],
+        locale: "en-US"
+      }
+    };
+
+    // Idioma inicial: el que eligió antes, o el del navegador, o español.
+    let idioma = (() => {
+      try { const guardado = localStorage.getItem("idioma"); if (TEXTOS[guardado]) return guardado; } catch (e) {}
+      const nav = (navigator.language || "es").slice(0, 2);
+      return TEXTOS[nav] ? nav : "es";
+    })();
+
+    // t("clave") devuelve el texto en el idioma actual
+    const t = (clave) => TEXTOS[idioma][clave] ?? TEXTOS.es[clave] ?? clave;
+
+    // Cambia todos los textos marcados con data-i18n / data-i18n-ph
+    function aplicarIdioma() {
+      document.documentElement.lang = idioma;
+      document.title = t("tituloPagina");
+      document.querySelectorAll("[data-i18n]").forEach(el => { el.textContent = t(el.dataset.i18n); });
+      document.querySelectorAll("[data-i18n-ph]").forEach(el => { el.placeholder = t(el.dataset.i18nPh); });
+      document.querySelectorAll("#idiomas button").forEach(b => b.setAttribute("aria-pressed", b.dataset.lang === idioma));
+    }
+
+    aplicarIdioma();   // poner los textos en el idioma elegido desde el inicio
+
+    // =========================================================
+    // PASO 0: Supabase (base de datos en internet)
+    // =========================================================
+    // Pega tu Project URL y tu publishable/anon key. ¡Nunca la secret!
+    // Vacías = todo se guarda solo en este navegador.
+    const SUPABASE_URL = "https://qaseuvsoghhlwkmnisln.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_iCFgjYpkNpC89MU--Im12w_IMmMx7cq";
+
+    // Link de donaciones (Ko-fi, Buy Me a Coffee, PayPal…). Vacío = sin botón.
+    // Correo de contacto para el aviso de privacidad (recomendado: uno solo
+    // para el proyecto). Vacío = se indica la página de Ko-fi como contacto.
+    const CONTACTO_EMAIL = "";
+
+    const DONACIONES_URL = "https://ko-fi.com/darkom0115";
+
+    const usarNube = Boolean(SUPABASE_URL && SUPABASE_KEY && window.supabase);
+    const db = usarNube ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+
+    const $ = (id) => document.getElementById(id);
+    const textoModo = () => usarNube ? t("modoNube") : t("modoLocal");
+
+    // =========================================================
+    // PASO 1: Tipos de entidad y datos
+    // =========================================================
+    // Cada tipo tiene nombre, código corto (para la etiqueta del radar) y color.
+    // ---------- Taxonomía del catálogo ----------
+    // CATEGORÍA: qué clase de fenómeno es. Los nombres y códigos salen del
+    // diccionario de idiomas (cat_... y cod_...).
+    const CATEGORIAS = {
+      fani:               { color: "var(--fani)" },        // UAP: término oficial desde 2022
+      criptido_alado:     { color: "var(--alado)" },       // Thunderbird, Kongamato, Ropen
+      bestia_atmosferica: { color: "var(--bestia)" },      // medusa atmosférica
+      varillas:           { color: "var(--varillas)" },    // rods / sky fish
+      serpiente:          { color: "var(--serpiente)" },   // serpiente del cielo
+      sin_clasificar:     { color: "var(--otro)" }
+    };
+    const claveCat = (c) => (c in CATEGORIAS ? c : "sin_clasificar");
+    const categoria = (c) => ({
+      ...CATEGORIAS[claveCat(c)],
+      nombre: t("cat_" + claveCat(c)),
+      codigo: t("cod_" + claveCat(c))
+    });
+
+    // Palabras con las que la gente busca cada categoría, aunque no sean
+    // el término del catálogo ("ovni", "medusa", "dinosaurio"…).
+    const SINONIMOS = {
+      fani: "ovni ufo uap platillo luz light",
+      criptido_alado: "dinosaurio pterosaurio dragon ave thunderbird kongamato ropen winged cryptid",
+      bestia_atmosferica: "medusa jellyfish ameba atmospheric beast",
+      varillas: "rods varilla skyfish",
+      serpiente: "serpiente snake sky serpent dragon",
+      sin_clasificar: "otro other unclassified"
+    };
+
+    // FORMA observada, con la lista que usan los formularios de reportes reales
+    const FORMAS = ["luz", "esfera", "disco", "triangulo", "cilindro", "ovalo",
+                    "formacion", "cambiante", "irregular", "otra"];
+
+    // CLASIFICACIÓN DE HYNEK (1972). Sale sola de la distancia, el momento
+    // y lo que ocurrió; nadie tiene que aprenderse los códigos.
+    //   DE-1 luz nocturna · DE-2 disco diurno · DE-3 radar-visual
+    //   EC-1 encuentro cercano · EC-2 con rastro · EC-3 con ocupante
+    function hynek(r) {
+      if (r.distancia === "cerca") {
+        if (r.efecto === "ocupante") return { codigo: "EC-3", nombre: t("hy_ec3") };
+        if (r.efecto === "rastro")   return { codigo: "EC-2", nombre: t("hy_ec2") };
+        return { codigo: "EC-1", nombre: t("hy_ec1") };
+      }
+      if (r.distancia !== "lejos") return null;
+      if (r.radar) return { codigo: "DE-3", nombre: t("hy_de3") };
+      // DE-1 y DE-2 describen objetos aéreos; para criaturas solo registramos
+      // que fue un avistamiento lejano (es el límite que señaló Vallée).
+      const aerea = ["fani", "sin_clasificar"].includes(claveCat(r.categoria));
+      if (!aerea) return { codigo: "DE", nombre: t("hy_de") };
+      return r.momento === "noche"
+        ? { codigo: "DE-1", nombre: t("hy_de1") }
+        : { codigo: "DE-2", nombre: t("hy_de2") };
+    }
+
+    // ÍNDICE DE EVIDENCIA (0 a 5): cuánto respaldo tiene el caso.
+    // No dice si es verdad, solo cuánto material lo acompaña.
+    function indiceEvidencia(r) {
+      let n = 0;
+      if (r.foto) n++;
+      if (r.youtube_id) n++;
+      if (r.efecto === "rastro") n++;
+      if (r.radar) n++;
+      if (r.testigos >= 2) n++;
+      if (r.testigos >= 5) n++;
+      return Math.min(n, 5);
+    }
+
+    // Fechas de ejemplo relativas a hoy, para que siempre caigan en "30 días"
+    const haceDias = (d) => new Date(Date.now() - d * 86400000).toISOString();
+
+    const reportesEjemplo = [
+      { id: "ejemplo-0001", categoria: "criptido_alado",     lugar: "Monterrey, N.L. (ejemplo)",  lat: 25.6866, lng: -100.3161, fecha: haceDias(4),  forma: "irregular", momento: "crepusculo", distancia: "lejos",  duracion: "segundos", testigos: 2, direccion: "NE", descripcion: "Silueta con alas grandes sobre el Cerro de la Silla.", estado: "no_identificado" },
+      { id: "ejemplo-0002", categoria: "bestia_atmosferica", lugar: "Chihuahua, Chih. (ejemplo)", lat: 28.6353, lng: -106.0889, fecha: haceDias(6),  forma: "cambiante", momento: "noche",      distancia: "lejos",  duracion: "min5a30",  testigos: 1, direccion: "N",  descripcion: "Forma brillante y flotante, se movía lento hacia el norte.", estado: "no_identificado" },
+      { id: "ejemplo-0003", categoria: "criptido_alado",     lugar: "El Paso, TX (ejemplo)",      lat: 31.7619, lng: -106.4850, fecha: haceDias(3),  forma: "irregular", momento: "crepusculo", distancia: "cerca",  efecto: "ninguno", duracion: "segundos", testigos: 1, descripcion: "Sombra grande que cruzó el cielo al atardecer.", estado: "datos_insuficientes" },
+      { id: "ejemplo-0004", categoria: "bestia_atmosferica", lugar: "San Antonio, TX (ejemplo)",  lat: 29.4241, lng: -98.4936,  fecha: haceDias(1),  forma: "luz",       momento: "noche",      distancia: "lejos",  duracion: "min1a5",   testigos: 6, direccion: "estacionario", descripcion: "Varias luces con 'tentáculos' colgando.", estado: "no_identificado" },
+      { id: "ejemplo-0005", categoria: "fani",               lugar: "Hermosillo, Son. (ejemplo)", lat: 29.0729, lng: -110.9559, fecha: haceDias(5),  forma: "formacion", momento: "noche",      distancia: "lejos",  duracion: "min1a5",   testigos: 3, direccion: "E",  descripcion: "Fila de luces que cruzó el cielo en línea recta.", estado: "ifo", explicacion: "Tren de satélites Starlink poco después de su lanzamiento." },
+      { id: "ejemplo-0006", categoria: "criptido_alado",     lugar: "Apodaca, N.L. (ejemplo)",    lat: 25.7810, lng: -100.1880, fecha: haceDias(2),  forma: "irregular", momento: "dia",        distancia: "lejos",  duracion: "min1a5",   testigos: 1, direccion: "NE", descripcion: "Algo enorme planeando sin hacer ruido, rumbo al aeropuerto.", estado: "no_identificado" },
+      { id: "ejemplo-0007", categoria: "varillas",           lugar: "Chihuahua, Chih. (ejemplo)", lat: 28.6700, lng: -106.1200, fecha: haceDias(40), forma: "cilindro",  momento: "dia",        distancia: "lejos",  duracion: "segundos", testigos: 1, descripcion: "Algo alargado que cruzó muy rápido; solo se vio al revisar el video.", estado: "no_identificado" }
+    ];
+
+    // --- Guardado local ---
+    const CLAVE = "avistamientos";
+    function leerLocal() { try { return JSON.parse(localStorage.getItem(CLAVE)) || []; } catch (e) { return []; } }
+    function escribirLocal(lista) { try { localStorage.setItem(CLAVE, JSON.stringify(lista)); return true; } catch (e) { return false; } }
+    function borrarLocal(id) { escribirLocal(leerLocal().filter(r => r.id !== id)); }
+
+    const fotoTextoActual = () => fotoTexto;   // la foto elegida en el formulario (si hay)
+
+    // --- Nube o local ---
+    let errorEnlace = null;
+    async function cargarReportes() {
+      if (!usarNube) return [...reportesEjemplo, ...leerLocal()];
+      const { data, error } = await db.from("reportes").select("*")
+        .in("estado", ["no_identificado", "ifo", "datos_insuficientes"])
+        .is("borrado_el", null)   // lo que está en la papelera no se muestra
+        .order("fecha", { ascending: false });
+      if (error) { errorEnlace = error.message; return []; }
+      return data.map(f => ({ ...f, foto: f.foto_url, nube: true }));
+    }
+
+    async function guardarReporte(r, fotoBlob) {
+      if (!usarNube) {
+        const lista = leerLocal();
+        lista.push({ ...r, id: "r-" + Date.now() });
+        return escribirLocal(lista) ? null : t("sinEspacio");
+      }
+      let fotoUrl = null;
+      // Si la foto aún no terminó de prepararse, la convertimos aquí
+      if (!fotoBlob && fotoTextoActual()) fotoBlob = await (await fetch(fotoTextoActual())).blob();
+      if (fotoBlob) {
+        const ruta = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
+        const subida = await db.storage.from("evidencias").upload(ruta, fotoBlob, { contentType: "image/jpeg" });
+        if (subida.error) return t("errorFoto") + subida.error.message;
+        fotoUrl = db.storage.from("evidencias").getPublicUrl(ruta).data.publicUrl;
+      }
+      const { error } = await db.from("reportes").insert({
+        categoria: r.categoria, forma: r.forma, lugar: r.lugar, lat: r.lat, lng: r.lng,
+        fecha: new Date(r.fecha).toISOString(),
+        descripcion: r.descripcion, foto_url: fotoUrl, youtube_id: r.youtube_id,
+        idioma: idioma,  // en qué idioma se escribió el reporte
+        direccion: r.direccion || null,
+        momento: r.momento, distancia: r.distancia, efecto: r.efecto,
+        duracion: r.duracion, testigos: r.testigos, radar: r.radar
+      });
+      if (!error) return null;
+      return /limite_envios/.test(error.message) ? t("limiteEnvios") : t("errorGuardar") + error.message;
+    }
+
+    // =========================================================
+    // PASO 2: El globo, con la imagen satelital oscurecida
+    // =========================================================
+    // "paint" ajusta cómo se pinta cada capa: le quitamos color
+    // (saturation) y brillo para que parezca pantalla de vigilancia.
+    const estilo = {
+      version: 8,
+      projection: { type: "globe" },
+      sources: {
+        satelite: {
+          type: "raster",
+          tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
+          tileSize: 256, maxzoom: 19
+        },
+        nombres: {
+          type: "raster",
+          tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"],
+          tileSize: 256, maxzoom: 19
+        }
+      },
+      layers: [
+        { id: "satelite", type: "raster", source: "satelite",
+          paint: { "raster-saturation": -0.8, "raster-brightness-max": 0.6, "raster-contrast": 0.2 } },
+        { id: "nombres", type: "raster", source: "nombres", paint: { "raster-opacity": 0.65 } }
+      ],
+      sky: { "atmosphere-blend": ["interpolate", ["linear"], ["zoom"], 0, 1, 5, 1, 7, 0] }
+    };
+
+    const mapa = new maplibregl.Map({
+      container: "mapa", style: estilo, center: [-104, 28], zoom: 2.2,
+      attributionControl: false   // los créditos los ponemos nosotros, para poder traducirlos
+    });
+    mapa.addControl(new maplibregl.NavigationControl(), "bottom-right");
+
+    // Créditos del mapa en el idioma actual (se vuelven a poner al cambiar de idioma)
+    let ctrlCreditos = null;
+    function ponerCreditos() {
+      if (ctrlCreditos) mapa.removeControl(ctrlCreditos);
+      ctrlCreditos = new maplibregl.AttributionControl({ compact: true, customAttribution: t("creditos") });
+      mapa.addControl(ctrlCreditos, "bottom-right");
+    }
+    ponerCreditos();
+
+    // Mostrar las coordenadas por donde pasa el cursor
+    // Antes de mover el mouse mostramos el centro del globo
+    $("cursor").textContent = `${mapa.getCenter().lat.toFixed(4)}, ${mapa.getCenter().lng.toFixed(4)}`;
+    mapa.on("mousemove", (e) => {
+      $("cursor").textContent = `${e.lngLat.lat.toFixed(4)}, ${e.lngLat.lng.toFixed(4)}`;
+    });
+
+    // Reloj con la hora local del visitante
+    function actualizarReloj() {
+      const ahora = new Date();
+      // Hora del dispositivo de quien visita (no UTC). "sv" da la fecha como 2026-11-14.
+      $("reloj").innerHTML = `<b>${ahora.toLocaleTimeString(t("locale"), { hour12: false })}</b><br>${ahora.toLocaleDateString("sv")} · ${t("horaLocal")}`;
+    }
+    actualizarReloj();
+    setInterval(actualizarReloj, 1000);   // se repite cada 1000 ms = 1 segundo
+
+    // =========================================================
+    // PASO 3: Ayudantes
+    // =========================================================
+    function escapar(texto) {
+      const div = document.createElement("div");
+      div.textContent = texto == null ? "" : String(texto);
+      return div.innerHTML.replace(/"/g, "&quot;");
+    }
+    function textoFecha(f) {
+      const d = new Date(f);
+      return isNaN(d) ? f : d.toLocaleString(t("locale"), { dateStyle: "medium", timeStyle: "short" });
+    }
+    function idDeYoutube(link) {
+      const m = String(link).match(/(?:youtu\.be\/|[?&]v=|\/(?:shorts|live|embed)\/)([\w-]{11})/);
+      return m ? m[1] : null;
+    }
+    function leerCoordenadas(texto) {
+      const m = texto.trim().match(/^(-?\d+(?:\.\d+)?)\s*[,\s]\s*(-?\d+(?:\.\d+)?)$/);
+      if (!m) return null;
+      const lat = parseFloat(m[1]), lng = parseFloat(m[2]);
+      if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+      return { lat, lng };
+    }
+    // Número de expediente a partir del id, ej. "MIRA-2026-4F2A"
+    function numeroExpediente(r) {
+      const año = String(r.fecha || "").slice(0, 4) || "----";
+      const base = String(r.id).replace(/[^a-z0-9]/gi, "").slice(-4).toUpperCase();
+      return `MIRA-${año}-${base}`;
+    }
+
+    // =========================================================
+    // PASO 4: Dibujar los contactos en el globo
+    // =========================================================
+    let marcadores = [];
+    let todos = [];
+    const visibles = new Set(Object.keys(CATEGORIAS));   // tipos que se muestran
+
+    function htmlExpediente(r) {
+      const tp = categoria(r.categoria);
+      const hy = hynek(r);                  // DE-1, EC-2…
+      const ev = indiceEvidencia(r);        // 0 a 5
+      const esMio = !r.nube && !String(r.id).startsWith("ejemplo");
+      const video = r.youtube_id
+        ? `<a class="video" data-texto="${t("verVideo")}" href="https://www.youtube.com/watch?v=${escapar(r.youtube_id)}" target="_blank" rel="noopener">
+             <img src="https://img.youtube.com/vi/${escapar(r.youtube_id)}/hqdefault.jpg" loading="lazy" alt="Video del avistamiento"></a>`
+        : "";
+      return `
+        <div class="expediente papel">
+          <div class="cabeza">
+            <span class="num">${numeroExpediente(r)}</span>
+            <span class="sello ${r.estado === "ifo" ? "explicado" : r.estado === "datos_insuficientes" ? "neutro" : ""}">${escapar(t("estados")[r.estado] || String(r.estado || "").toUpperCase())}</span>
+          </div>
+          <h3>${tp.nombre}</h3>
+          <dl>
+            ${hy ? `<dt>${t("hynek")}</dt><dd><b>${hy.codigo}</b> · ${hy.nombre}</dd>` : ""}
+            ${r.forma ? `<dt>${t("forma")}</dt><dd>${t("forma_" + r.forma)}</dd>` : ""}
+            <dt>${t("lugar")}</dt><dd>${escapar(r.lugar)}</dd>
+            <dt>${t("fecha")}</dt><dd>${escapar(textoFecha(r.fecha))}</dd>
+            <dt>${t("aproximado")}</dt><dd>${Number(r.lat).toFixed(2)}, ${Number(r.lng).toFixed(2)}</dd>
+            ${r.duracion ? `<dt>${t("duracion")}</dt><dd>${t("dur_" + r.duracion)}</dd>` : ""}
+            ${r.testigos ? `<dt>${t("testigos")}</dt><dd>${Number(r.testigos)}</dd>` : ""}
+            ${r.direccion ? `<dt>${t("rumbo")}</dt><dd>${textoRumbo(r.direccion)}</dd>` : ""}
+            <dt>${t("testigo")}</dt><dd><span class="tachado">${t("nombreReservado")}</span></dd>
+            <dt>${t("evidencia")}</dt><dd><span class="evidencia-barra" title="${t("explicaEvidencia")}">${"●".repeat(ev)}${"○".repeat(5 - ev)}</span> ${ev}/5</dd>
+            ${r.explicacion ? `<dt>${t("dictamen")}</dt><dd><b>${escapar(r.explicacion)}</b></dd>` : ""}
+          </dl>
+          <p>${escapar(r.descripcion)}</p>
+          ${r.foto ? `<img src="${escapar(r.foto)}" loading="lazy" alt="Fotografía del avistamiento">` : ""}
+          ${video}
+          ${esMio ? `<button class="btn-borrar" data-id="${escapar(r.id)}">${t("destruir")}</button>` : ""}
+          ${r.nube ? `<button class="btn-enlace" data-enlace="${escapar(r.id)}">${t("copiarEnlace")}</button>` : ""}
+          ${usarNube && r.nube ? `<div class="comunidad" data-id="${escapar(r.id)}"><p class="nota">${t("cargando")}</p></div>` : ""}
+          ${esAdmin && r.nube ? `<button class="btn-borrar" data-id="${escapar(r.id)}">${t("eliminarExp")}</button>` : ""}
+        </div>`;
+    }
+
+    // ---------- Filtros: periodo, vista y reproducción ----------
+    const DIAS = { "24h": 1, "7d": 7, "30d": 30, "todo": Infinity };
+    let periodo = "todo";         // al abrir se ve el archivo completo
+    let vista = "radar";          // "radar" (puntos) o "calor"
+    let cursorTiempo = null;      // durante "Reproducir": hasta qué momento mostrar
+    const DIA = 86400000;         // milisegundos en un día
+
+    const fechaMs = (r) => new Date(r.fecha).getTime();
+    const deTiposVisibles = () => todos.filter(r => visibles.has(claveCat(r.categoria)));
+
+    function inicioPeriodo() {
+      if (periodo !== "todo") return Date.now() - DIAS[periodo] * DIA;
+      const fechas = todos.map(fechaMs).filter(n => !isNaN(n));
+      return fechas.length ? Math.min(...fechas) : Date.now();
+    }
+
+    // Todos los reportes del periodo elegido (sin importar el filtro de tipo)
+    function enPeriodo() {
+      const desde = inicioPeriodo();
+      return todos.filter(r => fechaMs(r) >= desde);
+    }
+
+    // Los reportes del periodo elegido y de los tipos visibles
+    function filtrados() {
+      const desde = inicioPeriodo();
+      return deTiposVisibles().filter(r => fechaMs(r) >= desde);
+    }
+
+    function pintar() {
+      marcadores.forEach(m => m.remove());
+      marcadores = [];
+
+      const lista = filtrados();
+      listaActual = lista;
+      const masReciente = [...lista].sort((a, b) => fechaMs(b) - fechaMs(a))[0];
+
+      // En vista "radar" dibujamos un punto por reporte
+      if (vista === "radar") {
+        lista.forEach(r => {
+          const tp = categoria(r.categoria);
+          const el = document.createElement("div");
+          el.className = "blip" + (r === masReciente ? " nuevo" : "");
+          el.style.setProperty("--c", tp.color);
+          el.innerHTML = `<i></i><span>${tp.codigo}</span>`;
+          el.setAttribute("aria-label", `${tp.nombre} ${t("en")} ${r.lugar}`);
+
+          // El expediente se arma solo cuando alguien lo abre. Así las fotos
+          // se descargan bajo demanda y no gastamos transferencia de Supabase.
+          const popup = new maplibregl.Popup({ offset: 16, maxWidth: "330px" });
+          popup.on("open", () => {
+            popup.setHTML(htmlExpediente(r));
+            if (usarNube) cargarComunidad(r);
+            // Bajamos el punto en la pantalla para que el expediente quepa arriba
+            document.body.classList.add("leyendo");
+            marcarUrl(r.nube ? r.id : null);
+            mapa.easeTo({ center: [r.lng, r.lat], offset: [0, Math.round(innerHeight * 0.28)], duration: 500 });
+          });
+          popup.on("close", () => { document.body.classList.remove("leyendo"); marcarUrl(null); });
+          const m = new maplibregl.Marker({ element: el })
+            .setLngLat([r.lng, r.lat])
+            .setPopup(popup)
+            .addTo(mapa);
+          m.reporte = r;   // guardamos a qué reporte pertenece el punto
+          marcadores.push(m);
+        });
+      }
+
+      pintarFranja();
+      pintarFiltros(lista);
+      pintarZonas();
+      pintarLista();
+      aplicarCursor();
+    }
+
+    // Durante "Reproducir" solo se ven los reportes anteriores al cursor.
+    // En vez de volver a crear los puntos, solo los mostramos u ocultamos (más rápido).
+    let listaActual = [];
+    function aplicarCursor() {
+      const hasta = cursorTiempo ?? Infinity;
+      marcadores.forEach(m => { m.getElement().style.display = fechaMs(m.reporte) <= hasta ? "" : "none"; });
+      const visiblesAhora = listaActual.filter(r => fechaMs(r) <= hasta);
+      $("total").textContent = visiblesAhora.length;
+      pintarCapas(visiblesAhora);
+    }
+
+    function pintarFiltros(lista) {
+      $("modo").textContent = errorEnlace ? t("sinEnlace") + errorEnlace : textoModo();
+      // Si hay tipos ocultos, lo decimos junto al total para que las cuentas cuadren
+      const nOcultos = enPeriodo().length - lista.length;
+      $("ocultos").textContent = nOcultos > 0 ? nOcultos + t("ocultos") : "";
+      $("filtros").innerHTML = "";
+      Object.keys(CATEGORIAS).forEach(clave => {
+        const tp = categoria(clave);
+        const desde = inicioPeriodo();
+        const n = todos.filter(r => claveCat(r.categoria) === clave && fechaMs(r) >= desde).length;
+        const b = document.createElement("button");
+        b.className = "filtro";
+        b.setAttribute("aria-pressed", visibles.has(clave));
+        b.innerHTML = `<span class="punto" style="background:${tp.color}; color:${tp.color}"></span>${tp.nombre}<span class="n">${n}</span>`;
+        b.addEventListener("click", () => {
+          visibles.has(clave) ? visibles.delete(clave) : visibles.add(clave);
+          pintar();
+        });
+        $("filtros").appendChild(b);
+      });
+    }
+
+    // =========================================================
+    // PASO 4b: Mapa de calor, zonas activas y corredores
+    // =========================================================
+    // Los datos para el mapa de calor y las líneas van en formato GeoJSON:
+    // un estándar para describir puntos y líneas en un mapa.
+    let capasListas = false;
+    let ultimaLista = [];
+    let corredores = [];          // se calculan en pintarZonas()
+    let etiquetasCorredor = [];
+
+    mapa.on("load", () => {
+      mapa.addSource("reportes", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+      mapa.addLayer({
+        id: "calor", type: "heatmap", source: "reportes",
+        layout: { visibility: "none" },
+        paint: {
+          "heatmap-weight": 1,
+          "heatmap-intensity": ["interpolate", ["linear"], ["zoom"], 0, 1, 9, 3],
+          "heatmap-radius": ["interpolate", ["linear"], ["zoom"], 0, 14, 5, 30, 10, 60],
+          "heatmap-color": ["interpolate", ["linear"], ["heatmap-density"],
+            0, "rgba(0,0,0,0)",
+            0.2, "rgba(242,178,58,0.35)",
+            0.5, "rgba(242,178,58,0.75)",
+            0.8, "#F97316",
+            1, "#B3261E"],
+          "heatmap-opacity": 0.9
+        }
+      });
+      mapa.addSource("corredores", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+      mapa.addLayer({
+        id: "corredores", type: "line", source: "corredores",
+        paint: { "line-color": "#F2B23A", "line-width": 2, "line-dasharray": [2, 2], "line-opacity": 0.9 }
+      });
+      capasListas = true;
+      pintarCapas(ultimaLista);
+      pintarCorredores();
+    });
+
+    function pintarCapas(lista) {
+      ultimaLista = lista;
+      if (!capasListas) return;   // el mapa todavía no termina de cargar
+      mapa.getSource("reportes").setData({
+        type: "FeatureCollection",
+        features: lista.map(r => ({ type: "Feature", geometry: { type: "Point", coordinates: [r.lng, r.lat] }, properties: {} }))
+      });
+      mapa.setLayoutProperty("calor", "visibility", vista === "calor" ? "visible" : "none");
+    }
+
+    // --- Rumbos ---
+    const GRADOS = { N: 0, NE: 45, E: 90, SE: 135, S: 180, SW: 225, W: 270, NW: 315 };
+    const FLECHAS = { N: "↑", NE: "↗", E: "→", SE: "↘", S: "↓", SW: "↙", W: "←", NW: "↖" };
+    function textoRumbo(d) {
+      if (d === "estacionario") return t("quieto");
+      return d in GRADOS ? `${FLECHAS[d]} ${t("dirs")[d]}` : "";
+    }
+
+    // Punto a cierta distancia (km) y rumbo (grados) desde otro punto.
+    // Aproximación plana: suficiente para distancias cortas.
+    function puntoDestino(lat, lng, grados, km) {
+      const rad = grados * Math.PI / 180;
+      return {
+        lat: lat + (km * Math.cos(rad)) / 111,
+        lng: lng + (km * Math.sin(rad)) / (111 * Math.cos(lat * Math.PI / 180))
+      };
+    }
+
+    // --- Zonas activas ---
+    // Dividimos el mapa en cuadros de 0.5° (≈ 50 km) y contamos reportes
+    // del periodo elegido en cada cuadro; luego comparamos con el periodo anterior
+    // del mismo tamaño (con "Todo" no hay periodo anterior, así que no hay tendencia).
+    function calcularZonas() {
+      const ahora = Date.now();
+      const dias = DIAS[periodo];
+      const celdas = {};
+      deTiposVisibles().forEach(r => {
+        const edad = ahora - fechaMs(r);
+        if (isNaN(edad) || edad < 0 || edad > 2 * dias * DIA) return;
+        const clave = `${Math.floor(r.lat / 0.5)},${Math.floor(r.lng / 0.5)}`;
+        celdas[clave] ??= { recientes: [], anteriores: 0 };
+        if (edad <= dias * DIA) celdas[clave].recientes.push(r);
+        else celdas[clave].anteriores++;
+      });
+
+      return Object.values(celdas)
+        .filter(c => c.recientes.length > 0)
+        .map(c => {
+          const rs = c.recientes;
+          const lat = rs.reduce((s, r) => s + r.lat, 0) / rs.length;
+          const lng = rs.reduce((s, r) => s + r.lng, 0) / rs.length;
+          // El nombre de lugar más repetido en la zona
+          const conteo = {};
+          rs.forEach(r => { conteo[r.lugar] = (conteo[r.lugar] || 0) + 1; });
+          const nombre = Object.entries(conteo).sort((a, b) => b[1] - a[1])[0][0];
+          const n = rs.length, prev = c.anteriores;
+          const tendencia = dias === Infinity ? null : prev === 0 ? "nueva" : n > prev ? "sube" : n < prev ? "baja" : "igual";
+
+          // Rumbo promedio: sumamos flechas de largo 1. Si apuntan a lados
+          // distintos se cancelan; solo proyectamos si coinciden bastante.
+          const conRumbo = rs.filter(r => r.direccion in GRADOS);
+          let rumbo = null;
+          if (conRumbo.length >= 2) {
+            let x = 0, y = 0;
+            conRumbo.forEach(r => { const a = GRADOS[r.direccion] * Math.PI / 180; x += Math.sin(a); y += Math.cos(a); });
+            const acuerdo = Math.hypot(x, y) / conRumbo.length;   // 1 = todos iguales, 0 = opuestos
+            if (acuerdo >= 0.5) rumbo = (Math.atan2(x, y) * 180 / Math.PI + 360) % 360;
+          }
+          return { lat, lng, nombre, n, tendencia, rumbo };
+        })
+        .sort((a, b) => b.n - a.n)
+        .slice(0, 3);
+    }
+
+    // Franja superior: el avistamiento más reciente del archivo.
+    // Intl.RelativeTimeFormat escribe "hace 3 horas" / "3 hours ago" solo.
+    function haceCuanto(ms) {
+      const rtf = new Intl.RelativeTimeFormat(t("locale"), { numeric: "auto" });
+      let v = (ms - Date.now()) / 1000;   // negativo = en el pasado
+      for (const [unidad, tope] of [["second", 60], ["minute", 60], ["hour", 24], ["day", 30], ["month", 12]]) {
+        if (Math.abs(v) < tope) return rtf.format(Math.round(v), unidad);
+        v /= tope;
+      }
+      return rtf.format(Math.round(v), "year");
+    }
+
+    function pintarFranja() {
+      const ahora = Date.now();
+      // El más reciente que ya ocurrió (ignora fechas puestas a futuro por error)
+      const ultimo = todos
+        .filter(r => fechaMs(r) <= ahora)
+        .sort((a, b) => fechaMs(b) - fechaMs(a))[0];
+      // La etiqueta va en su propio <span> para poder ocultarla en celular
+      $("franja").innerHTML = ultimo
+        ? `<span class="etiqueta">${t("ultimoContacto")} · </span>${escapar(haceCuanto(fechaMs(ultimo)))} · ${escapar(ultimo.lugar)}`
+        : escapar(t("franja"));
+    }
+    setInterval(pintarFranja, 60000);   // "hace 3 h" se mantiene al día
+
+    function pintarZonas() {
+      const zonas = calcularZonas();
+      const ol = $("zonas");
+      ol.innerHTML = "";
+      $("zonas-titulo").textContent = `${t("zonasActivas")} · ${t("p" + periodo)}`;
+      if (!zonas.length) {
+        // ¿Está vacío porque no hay reportes, o porque los filtros los ocultan?
+        ol.innerHTML = `<li class="vacio">${enPeriodo().length ? t("sinPorFiltro") : t("sinZonas")}</li>`;
+      }
+      const flecha = { sube: "↑", baja: "↓", igual: "=", nueva: "•" };
+      const texto = { sube: t("tendSube"), baja: t("tendBaja"), igual: t("tendIgual"), nueva: t("tendNueva") };
+      zonas.forEach(z => {
+        const li = document.createElement("li");
+        const b = document.createElement("button");
+        b.innerHTML = `<span class="z-nombre">${escapar(z.nombre)}</span>
+                       <span class="z-dato ${z.tendencia === "sube" ? "sube" : ""}" title="${texto[z.tendencia] || ""}">${z.n} ${flecha[z.tendencia] || ""}</span>`;
+        b.setAttribute("aria-label", `${z.nombre}: ${z.n}${z.tendencia ? ", " + texto[z.tendencia] : ""}`);
+        b.addEventListener("click", () => mapa.flyTo({ center: [z.lng, z.lat], zoom: 7 }));
+        li.appendChild(b);
+        ol.appendChild(li);
+      });
+
+      // Corredores: 150 km en la dirección del rumbo promedio de cada zona
+      corredores = zonas.filter(z => z.rumbo !== null).map(z => {
+        const fin = puntoDestino(z.lat, z.lng, z.rumbo, 150);
+        return { inicio: z, fin };
+      });
+      pintarCorredores();
+    }
+
+    function pintarCorredores() {
+      etiquetasCorredor.forEach(m => m.remove());
+      etiquetasCorredor = [];
+      if (!capasListas) return;
+      mapa.getSource("corredores").setData({
+        type: "FeatureCollection",
+        features: corredores.map(c => ({
+          type: "Feature", properties: {},
+          geometry: { type: "LineString", coordinates: [[c.inicio.lng, c.inicio.lat], [c.fin.lng, c.fin.lat]] }
+        }))
+      });
+      corredores.forEach(c => {
+        const el = document.createElement("div");
+        el.className = "proyeccion";
+        el.textContent = t("proyeccion");
+        etiquetasCorredor.push(new maplibregl.Marker({ element: el }).setLngLat([c.fin.lng, c.fin.lat]).addTo(mapa));
+      });
+    }
+
+    // --- Lista y buscador de reportes ---
+    // Permite encontrar y abrir cualquier reporte sin tocar el globo.
+    function pintarLista() {
+      const ul = $("lista-reportes");
+      const q = $("buscar-reporte").value.trim().toLowerCase();
+      const lista = [...listaActual]
+        .sort((a, b) => fechaMs(b) - fechaMs(a))
+        .filter(r => !q || `${r.lugar} ${categoria(r.categoria).nombre} ${categoria(r.categoria).codigo} ${SINONIMOS[claveCat(r.categoria)]}`.toLowerCase().includes(q))
+        .slice(0, 60);
+      ul.innerHTML = "";
+      if (!lista.length) {
+        const motivo = q ? t("sinCoincidencias") : enPeriodo().length ? t("sinPorFiltro") : t("sinZonas");
+        ul.innerHTML = `<li class="vacio">${motivo}</li>`;
+        return;
+      }
+      lista.forEach(r => {
+        const tp = categoria(r.categoria);
+        const li = document.createElement("li");
+        const b = document.createElement("button");
+        b.innerHTML = `<span style="color:${tp.color}">${tp.codigo}</span>
+          <span><span class="l-lugar">${escapar(r.lugar)}</span><small>${escapar(new Date(r.fecha).toLocaleDateString(t("locale"), { dateStyle: "medium" }))}</small></span>`;
+        b.addEventListener("click", () => abrirReporte(r));
+        li.appendChild(b);
+        ul.appendChild(li);
+      });
+    }
+    $("buscar-reporte").addEventListener("input", pintarLista);
+
+    function abrirReporte(r) {
+      if (vista !== "radar") { vista = "radar"; marcarBotones(); pintar(); }   // los puntos solo existen en Radar
+      const m = marcadores.find(x => x.reporte.id === r.id);
+      if (!m) return;
+      marcadores.forEach(x => { if (x !== m && x.getPopup().isOpen()) x.togglePopup(); });
+      if (!m.getPopup().isOpen()) m.togglePopup();   // al abrirse, el globo vuela hasta el punto
+    }
+
+    // --- Panel plegable (en celular empieza cerrado) ---
+    const registro = $("registro");
+    function pintarPlegar() {
+      const plegado = registro.classList.contains("plegado");
+      $("btn-plegar").textContent = plegado ? t("abrirFiltros") : t("cerrarFiltros");
+      $("btn-plegar").setAttribute("aria-expanded", !plegado);
+    }
+    if (matchMedia("(max-width: 700px)").matches) registro.classList.add("plegado");
+    $("btn-plegar").addEventListener("click", () => { registro.classList.toggle("plegado"); pintarPlegar(); });
+    pintarPlegar();
+
+    // --- Botones de periodo y vista ---
+    function marcarBotones() {
+      document.querySelectorAll("#periodos button").forEach(b => b.setAttribute("aria-pressed", b.dataset.periodo === periodo));
+      document.querySelectorAll("#vistas button").forEach(b => b.setAttribute("aria-pressed", b.dataset.vista === vista));
+    }
+    document.querySelectorAll("#periodos button").forEach(b => b.addEventListener("click", () => {
+      detenerReproduccion();
+      periodo = b.dataset.periodo; marcarBotones(); pintar();
+    }));
+    document.querySelectorAll("#vistas button").forEach(b => b.addEventListener("click", () => {
+      vista = b.dataset.vista; marcarBotones(); pintar();
+    }));
+    marcarBotones();
+
+    // --- Reproducir: muestra los reportes apareciendo en orden ---
+    let reproduccion = null;
+    function detenerReproduccion() {
+      if (!reproduccion) return;
+      clearInterval(reproduccion);
+      reproduccion = null;
+      cursorTiempo = null;
+      $("btn-reproducir").textContent = t("reproducir");
+      $("hasta").textContent = "";
+    }
+    $("btn-reproducir").addEventListener("click", () => {
+      if (reproduccion) { detenerReproduccion(); aplicarCursor(); return; }
+      const inicio = inicioPeriodo(), fin = Date.now(), DURACION = 6000;   // 6 segundos
+      const arranque = performance.now();
+      $("btn-reproducir").textContent = t("detener");
+      reproduccion = setInterval(() => {
+        // avance de 0 a 1 según el tiempo real transcurrido
+        const avance = Math.min(1, (performance.now() - arranque) / DURACION);
+        cursorTiempo = inicio + (fin - inicio) * avance;
+        $("hasta").textContent = t("hasta") + new Date(cursorTiempo).toLocaleDateString(t("locale"), { dateStyle: "medium" });
+        aplicarCursor();
+        if (avance >= 1) { detenerReproduccion(); aplicarCursor(); }
+      }, 100);
+    });
+
+    async function recargar() {
+      todos = await cargarReportes();
+      pintar();
+      abrirCasoDeLaUrl();
+    }
+    recargar();
+
+    // =========================================================
+    // PASO 5: Pantalla de arranque
+    // =========================================================
+    // Escribe unas líneas una por una y luego desaparece.
+    (function arrancar() {
+      const lineas = t("arranque");
+      const pantalla = $("arranque");
+      const quitar = () => pantalla.classList.add("fuera");
+      if (matchMedia("(prefers-reduced-motion: reduce)").matches) { quitar(); return; }
+      pantalla.addEventListener("click", quitar);
+      lineas.forEach((l, i) => setTimeout(() => { $("arranque-texto").textContent += l + "\n"; }, 300 + i * 380));
+      setTimeout(quitar, 300 + lineas.length * 380 + 500);
+    })();
+
+    // =========================================================
+    // PASO 6: Abrir / cerrar el formulario
+    // =========================================================
+    const panel = $("panel"), formulario = $("formulario"), mensaje = $("mensaje");
+    let ubicacion = null, pinTemporal = null, eligiendo = false, fotoTexto = null, fotoBlob = null;
+
+    // ---------- Grupos de opciones (momento, distancia, duración…) ----------
+    // Cada grupo es una fila de botones que funciona como un "elige uno".
+    function grupo(id, alCambiar) {
+      const cont = $(id);
+      let valor = "";
+      const pintar = () => cont.querySelectorAll("button")
+        .forEach(b => b.setAttribute("aria-checked", b.dataset.val === valor));
+      cont.addEventListener("click", (e) => {
+        const b = e.target.closest("button");
+        if (!b) return;
+        valor = b.dataset.val;
+        pintar();
+        if (alCambiar) alCambiar(valor);
+      });
+      pintar();
+      return {
+        get: () => valor,
+        limpiar: () => { valor = ""; pintar(); if (alCambiar) alCambiar(""); }
+      };
+    }
+    const gMomento   = grupo("momento");
+    const gDistancia = grupo("distancia", (v) => { $("bloque-efecto").hidden = v !== "cerca"; });
+    const gEfecto    = grupo("efecto");
+    const gDuracion  = grupo("duracion");
+
+    // ---------- Formulario por pasos ----------
+    const TOTAL_PASOS = 4;
+    const TITULOS_PASO = ["pasoQue", "pasoDonde", "pasoComo", "pasoEvidencia"];
+    let pasoActual = 1;
+
+    function mostrarPaso(n) {
+      pasoActual = n;
+      document.querySelectorAll(".paso").forEach(p => { p.hidden = Number(p.dataset.paso) !== n; });
+      $("pasos").querySelectorAll("span").forEach((s, i) => s.classList.toggle("hecho", i < n));
+      $("paso-titulo").textContent = `${t("paso")} ${n} ${t("de")} ${TOTAL_PASOS} · ${t(TITULOS_PASO[n - 1])}`;
+      $("btn-atras").hidden = n === 1;
+      $("btn-siguiente").hidden = n === TOTAL_PASOS;
+      $("btn-guardar").hidden = n !== TOTAL_PASOS;
+      mensaje.textContent = "";
+      panel.scrollTop = 0;
+    }
+
+    // Revisa que no falte nada antes de pasar al siguiente paso
+    function validarPaso(n) {
+      if (n === 1 && $("descripcion").value.trim().length < 3) return t("faltaDescripcion");
+      if (n === 2) {
+        if (!ubicacion) return t("faltanCoord");
+        if (!$("lugar").value.trim()) return t("faltaLugar");
+        if (!$("fecha").value) return t("faltaFecha");
+        if (!gMomento.get()) return t("faltaMomento");
+      }
+      if (n === 3) {
+        if (!gDistancia.get()) return t("faltaDistancia");
+        if (gDistancia.get() === "cerca" && !gEfecto.get()) return t("faltaEfecto");
+      }
+      return null;
+    }
+
+    $("btn-siguiente").addEventListener("click", () => {
+      const error = validarPaso(pasoActual);
+      if (error) { mensaje.textContent = error; return; }
+      mostrarPaso(pasoActual + 1);
+    });
+    $("btn-atras").addEventListener("click", () => mostrarPaso(pasoActual - 1));
+
+    // Trampa de tiempo: cuenta desde que empieza un borrador nuevo.
+    // (No se reinicia al reabrir el panel, para no castigar a quien retoma su borrador.)
+    let abiertoEn = Date.now();
+
+    function abrirFormulario() {
+      marcadores.forEach(m => { if (m.getPopup().isOpen()) m.togglePopup(); });   // cerrar expedientes abiertos
+      panel.classList.add("abierto");
+      const ahora = new Date();
+      // Solo ponemos la hora actual si no hay un borrador con su propia fecha
+      if (!$("fecha").value) {
+        const local = new Date(ahora.getTime() - ahora.getTimezoneOffset() * 60000);
+        $("fecha").value = local.toISOString().slice(0, 16);
+      }
+      $("num-nuevo").textContent = `MIRA-${ahora.getFullYear()}-${t("expNuevo")}`;
+      mostrarPaso(pasoActual);
+      $("categoria").focus();
+    }
+    // Ocultar el panel SIN borrar lo escrito (el borrador se conserva)
+    function ocultarFormulario() {
+      panel.classList.remove("abierto");
+      if (eligiendo) { eligiendo = false; $("aviso-elegir").style.display = "none"; }
+    }
+    // El botón principal abre y cierra el panel
+    $("btn-abrir").addEventListener("click", () => {
+      if (panel.classList.contains("abierto")) ocultarFormulario(); else abrirFormulario();
+    });
+    $("panel-cerrar").addEventListener("click", ocultarFormulario);
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && (panel.classList.contains("abierto") || eligiendo)) ocultarFormulario();
+    });
+    // "Descartar borrador" sí borra todo
+    $("btn-cancelar").addEventListener("click", cerrarFormulario);
+
+    function pintarNombreFoto() {
+      const archivo = $("foto").files[0];
+      $("foto-nombre").textContent = archivo ? archivo.name : t("sinFoto");
+    }
+
+    function cerrarFormulario() {
+      panel.classList.remove("abierto");
+      formulario.reset();
+      ubicacion = null; fotoTexto = null; fotoBlob = null;
+      direccionElegida = ""; pintarBrujula();
+      [gMomento, gDistancia, gEfecto, gDuracion].forEach(g => g.limpiar());
+      $("testigos").value = 1;
+      abiertoEn = Date.now();   // empieza un borrador nuevo
+      mostrarPaso(1);
+      $("ubicacion-texto").textContent = t("sinCoordenadas");
+      $("vista-previa").style.display = "none";
+      $("vista-video").style.display = "none";
+      $("resultados").innerHTML = "";
+      mensaje.textContent = "";
+      pintarNombreFoto();
+      if (pinTemporal) { pinTemporal.remove(); pinTemporal = null; }
+    }
+    pintarNombreFoto();
+
+    // =========================================================
+    // PASO 7: Ubicación (buscar, coordenadas, globo, GPS)
+    // =========================================================
+    function ponerUbicacion(lat, lng, nombre) {
+      ubicacion = { lat, lng };
+      $("ubicacion-texto").textContent = `${t("coordFijadas")}${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+      if (nombre && !$("lugar").value) $("lugar").value = nombre;
+
+      if (pinTemporal) pinTemporal.remove();
+      const el = document.createElement("div");
+      el.className = "blip nuevo";
+      el.style.setProperty("--c", "#ffffff");
+      el.innerHTML = `<i></i><span>${t("nuevo")}</span>`;
+      pinTemporal = new maplibregl.Marker({ element: el }).setLngLat([lng, lat]).addTo(mapa);
+      mapa.flyTo({ center: [lng, lat], zoom: Math.max(mapa.getZoom(), 9) });
+    }
+
+    async function buscar() {
+      const texto = $("buscar").value.trim();
+      const lista = $("resultados");
+      lista.innerHTML = "";
+      if (!texto) return;
+
+      const c = leerCoordenadas(texto);
+      if (c) { ponerUbicacion(c.lat, c.lng); return; }
+
+      lista.innerHTML = `<li>${t("buscando")}</li>`;
+      try {
+        const url = "https://photon.komoot.io/api/?limit=10&lat=28&lon=-104" + (idioma === "en" ? "&lang=en" : "") + "&q=" + encodeURIComponent(texto);
+        const datos = await (await fetch(url)).json();
+        lista.innerHTML = "";
+        if (!datos.features.length) { lista.innerHTML = `<li>${t("sinResultados")}</li>`; return; }
+
+        // Photon a veces repite el mismo lugar: quitamos los que tienen el
+        // mismo nombre y casi las mismas coordenadas, y mostramos máximo 5.
+        const vistos = new Set();
+        let mostrados = 0;
+        datos.features.forEach(f => {
+          const p = f.properties;
+          const nombre = [p.name, p.city !== p.name ? p.city : null, p.state, p.country].filter(Boolean).join(", ");
+          const [lng, lat] = f.geometry.coordinates;
+          const huella = `${nombre.toLowerCase()}|${lat.toFixed(1)}|${lng.toFixed(1)}`;
+          if (vistos.has(huella) || mostrados >= 5) return;
+          vistos.add(huella); mostrados++;
+          const li = document.createElement("li");
+          li.textContent = nombre;
+          li.tabIndex = 0;
+          const elegir = () => { ponerUbicacion(lat, lng, nombre); lista.innerHTML = ""; };
+          li.addEventListener("click", elegir);
+          li.addEventListener("keydown", (e) => { if (e.key === "Enter") elegir(); });
+          lista.appendChild(li);
+        });
+      } catch (e) {
+        lista.innerHTML = `<li>${t("errorBuscar")}</li>`;
+      }
+    }
+    $("btn-buscar").addEventListener("click", buscar);
+    $("buscar").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); buscar(); } });
+
+    $("btn-elegir").addEventListener("click", () => {
+      eligiendo = true;
+      panel.classList.remove("abierto");
+      $("aviso-elegir").style.display = "block";
+    });
+    mapa.on("click", (e) => {
+      if (!eligiendo) return;
+      eligiendo = false;
+      ponerUbicacion(e.lngLat.lat, e.lngLat.lng);
+      $("aviso-elegir").style.display = "none";
+      panel.classList.add("abierto");
+    });
+
+    $("btn-gps").addEventListener("click", () => {
+      if (!navigator.geolocation) { mensaje.textContent = t("sinGps"); return; }
+      mensaje.textContent = t("obteniendoGps");
+      navigator.geolocation.getCurrentPosition(
+        (pos) => { mensaje.textContent = ""; ponerUbicacion(pos.coords.latitude, pos.coords.longitude); },
+        () => { mensaje.textContent = t("gpsBloqueado"); }
+      );
+    });
+
+    // --- Brújula: hacia dónde se movía ---
+    let direccionElegida = "";
+    function pintarBrujula() {
+      document.querySelectorAll("#brujula button").forEach(b => {
+        const d = b.dataset.dir;
+        b.textContent = d === "estacionario" ? "●" : `${FLECHAS[d]} ${t("dirs")[d]}`;
+        b.setAttribute("aria-label", d === "estacionario" ? t("quieto") : t("dirs")[d]);
+        if (d === "estacionario") b.title = t("quieto");
+      });
+      document.querySelectorAll("#brujula button, #dir-nose").forEach(b =>
+        b.setAttribute("aria-checked", b.dataset.dir === direccionElegida));
+    }
+    document.querySelectorAll("#brujula button, #dir-nose").forEach(b => b.addEventListener("click", () => {
+      direccionElegida = b.dataset.dir;
+      pintarBrujula();
+    }));
+    pintarBrujula();
+
+    // =========================================================
+    // PASO 8: Evidencias (foto y video)
+    // =========================================================
+    $("foto").addEventListener("change", (e) => {
+      const archivo = e.target.files[0];
+      fotoTexto = null; fotoBlob = null;
+      pintarNombreFoto();
+      if (!archivo) { $("vista-previa").style.display = "none"; return; }
+      const img = new Image();
+      img.onload = () => {
+        const escala = Math.min(1, 800 / img.width);
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.width * escala);
+        canvas.height = Math.round(img.height * escala);
+        canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+        fotoTexto = canvas.toDataURL("image/jpeg", 0.7);
+        canvas.toBlob(b => { fotoBlob = b; }, "image/jpeg", 0.7);
+        $("vista-previa").src = fotoTexto;
+        $("vista-previa").style.display = "block";
+        URL.revokeObjectURL(img.src);
+      };
+      img.src = URL.createObjectURL(archivo);
+    });
+
+    $("youtube").addEventListener("input", () => {
+      const id = idDeYoutube($("youtube").value);
+      $("vista-video").style.display = id ? "block" : "none";
+      if (id) $("vista-video").src = `https://img.youtube.com/vi/${id}/hqdefault.jpg`;
+    });
+
+    // =========================================================
+    // PASO 9: Archivar (guardar)
+    // =========================================================
+    formulario.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      mensaje.textContent = "";
+      if (!ubicacion) { mensaje.textContent = t("faltanCoord"); return; }
+
+      // Antispam: el campo trampa solo lo llena un robot, y nadie llena
+      // cuatro pasos en menos de ocho segundos. En ambos casos fingimos
+      // que todo salió bien, pero no se guarda nada.
+      const esRobot = $("trampa").value !== "" || (Date.now() - abiertoEn) < 8000;
+
+      const link = $("youtube").value.trim();
+      const youtubeId = link ? idDeYoutube(link) : null;
+      if (link && !youtubeId) { mensaje.textContent = t("noYoutube"); return; }
+
+      // Última revisión de todos los pasos, por si alguien saltó alguno
+      for (let n = 1; n <= TOTAL_PASOS; n++) {
+        const falta = validarPaso(n);
+        if (falta) { mostrarPaso(n); mensaje.textContent = falta; return; }
+      }
+
+      const nuevo = {
+        categoria: $("categoria").value,
+        forma: $("forma").value || null,
+        lugar: $("lugar").value.trim(),
+        // Redondeamos a 2 decimales (~1 km) para no publicar el punto exacto
+        lat: Math.round(ubicacion.lat * 100) / 100,
+        lng: Math.round(ubicacion.lng * 100) / 100,
+        fecha: $("fecha").value,
+        descripcion: $("descripcion").value.trim(),
+        foto: usarNube ? null : fotoTexto,
+        youtube_id: youtubeId,
+        direccion: direccionElegida || null,
+        momento: gMomento.get() || null,
+        distancia: gDistancia.get() || null,
+        efecto: gDistancia.get() === "cerca" ? (gEfecto.get() || null) : null,
+        duracion: gDuracion.get() || null,
+        testigos: Math.min(999, Math.max(1, Number($("testigos").value) || 1)),
+        radar: $("radar").checked,
+        estado: "no_identificado"   // solo en modo local; en la nube entra como "pendiente"
+      };
+
+      const boton = $("btn-guardar");
+      boton.disabled = true; boton.textContent = t("guardando");
+      const error = esRobot ? null : await guardarReporte(nuevo, fotoBlob);
+      boton.disabled = false; boton.textContent = t("btnGuardar");
+      if (error) { mensaje.textContent = error; return; }
+
+      cerrarFormulario();
+      if (usarNube) {
+        // En la nube el reporte queda pendiente: todavía no aparece en el globo
+        notificar(t("recibido"));
+      } else {
+        await recargar();
+        mapa.flyTo({ center: [nuevo.lng, nuevo.lat], zoom: 6 });
+      }
+    });
+
+    // =========================================================
+    // PASO 10: Destruir expediente (solo los locales tuyos)
+    // =========================================================
+    document.addEventListener("click", async (e) => {
+      if (!e.target.classList.contains("btn-borrar")) return;
+      const id = e.target.dataset.id;
+
+      if (!usarNube) {                       // modo local: como antes
+        if (!confirm(t("confirmarDestruir"))) return;
+        borrarLocal(id);
+        recargar();
+        return;
+      }
+
+      // Modo en línea: solo agentes administradores
+      if (!esAdmin || !confirm(t("confirmarEliminar"))) return;
+      const r = todos.find(x => x.id === id);
+      const error = await eliminarEnNube(r);
+      if (error) { notificar(t("errorEliminar") + error); return; }
+      document.querySelectorAll(".maplibregl-popup").forEach(p => p.remove());
+      notificar(t("eliminado"));
+      recargar();
+    });
+
+    async function eliminarEnNube(r) {
+      // 1) Borrar el reporte. ".select()" nos devuelve lo borrado: si viene
+      //    vacío, las reglas de seguridad no lo permitieron.
+      const { data, error } = await db.from("reportes").delete().eq("id", r.id).select("id");
+      if (error) return error.message;
+      if (!data || !data.length) return t("noEsAdmin");
+
+      // 2) Borrar su foto (la ruta es lo que va después de "/evidencias/")
+      if (r.foto_url && r.foto_url.includes("/evidencias/")) {
+        const ruta = decodeURIComponent(r.foto_url.split("/evidencias/")[1]);
+        await db.storage.from("evidencias").remove([ruta]);
+      }
+      return null;
+    }
+
+    // =========================================================
+    // PASO 10b: Cuentas — entrar, crear cuenta, salir
+    // =========================================================
+    // Supabase guarda la sesión en el navegador (localStorage), así que la
+    // persona solo entra una vez por dispositivo. La contraseña nunca pasa
+    // por nuestro código más que para enviarla cifrada (https) a Supabase.
+    let sesion = null;     // la sesión actual (o null)
+    let perfil = null;     // { alias }
+    let esAdmin = false;
+
+    const login = $("login");
+    const VISTAS = ["entrar", "crear", "perfil", "clave"];
+    function mostrarVista(v) {
+      VISTAS.forEach(x => { $("vista-" + x).hidden = x !== v; });
+      $("login-error").textContent = "";
+    }
+    function abrirCuenta(v) {
+      if (!usarNube) { notificar(t("sinNube")); return; }
+      acerca.classList.remove("abierto");
+      mostrarVista(v || (sesion ? "perfil" : "entrar"));
+      login.classList.add("abierto");
+      const campo = login.querySelector("form:not([hidden]) input");
+      if (campo) campo.focus();
+    }
+    const cerrarCuenta = () => login.classList.remove("abierto");
+
+    function pintarCuenta() {
+      const texto = sesion && perfil ? "@" + perfil.alias : t("entrar");
+      document.querySelectorAll(".btn-cuenta").forEach(b => { b.textContent = texto; });
+      $("perfil-datos").textContent = sesion ? t("sesionComo") + "@" + (perfil ? perfil.alias : "?") + " · " + sesion.user.email : "";
+      $("link-panel").hidden = !esAdmin;
+      // Si hay un expediente abierto, actualizamos sus botones de voto
+      document.querySelectorAll(".comunidad").forEach(c => {
+        const r = todos.find(x => String(x.id) === c.dataset.id);
+        if (r) cargarComunidad(r);
+      });
+    }
+
+    async function crearPerfil() {
+      // El alias se eligió al crear la cuenta; si falta o ya está ocupado, lo pedimos.
+      let alias = sesion.user.user_metadata && sesion.user.user_metadata.alias;
+      for (let intento = 0; intento < 3; intento++) {
+        if (!alias || !/^[A-Za-z0-9_]{3,20}$/.test(alias)) alias = prompt(t("pedirAlias"));
+        if (!alias) return;
+        alias = alias.trim();
+        const { error } = await db.from("perfiles").insert({ user_id: sesion.user.id, alias });
+        if (!error) { perfil = { alias }; return; }
+        alert(t("aliasOcupado"));
+        alias = null;
+      }
+    }
+
+    async function actualizarSesion() {
+      if (!usarNube) { pintarCuenta(); return; }
+      const { data } = await db.auth.getSession();
+      sesion = data.session;
+      perfil = null; esAdmin = false;
+      if (sesion) {
+        const [p, a] = await Promise.all([
+          db.from("perfiles").select("alias").eq("user_id", sesion.user.id).maybeSingle(),
+          db.rpc("es_admin")
+        ]);
+        perfil = p.data;
+        esAdmin = a.data === true;
+        if (!perfil && !p.error) await crearPerfil();
+      }
+      pintarCuenta();
+    }
+
+    document.querySelectorAll(".btn-cuenta").forEach(b => b.addEventListener("click", () => abrirCuenta()));
+    $("login-cerrar").addEventListener("click", cerrarCuenta);
+    login.addEventListener("click", (e) => { if (e.target === login) cerrarCuenta(); });
+    $("ir-crear").addEventListener("click", () => mostrarVista("crear"));
+    $("ir-entrar").addEventListener("click", () => mostrarVista("entrar"));
+    if (location.hash === "#admin" || location.hash === "#agente") setTimeout(() => abrirCuenta(), 0);
+
+    // Deshabilita el botón de un formulario mientras se envía
+    async function conEspera(form, tarea) {
+      const boton = form.querySelector("button[type=submit]");
+      boton.disabled = true;
+      try { await tarea(); } finally { boton.disabled = false; }
+    }
+
+    // --- Entrar ---
+    $("vista-entrar").addEventListener("submit", (e) => {
+      e.preventDefault();
+      conEspera(e.target, async () => {
+        const { error } = await db.auth.signInWithPassword({
+          email: $("login-correo").value.trim(), password: $("login-clave").value
+        });
+        if (error) { $("login-error").textContent = t("errorLogin"); return; }
+        e.target.reset();
+        await actualizarSesion();
+        cerrarCuenta();
+        notificar(t("bienvenido") + "@" + (perfil ? perfil.alias : ""));
+      });
+    });
+
+    // --- Crear cuenta ---
+    $("vista-crear").addEventListener("submit", (e) => {
+      e.preventDefault();
+      conEspera(e.target, async () => {
+        const alias = $("reg-alias").value.trim();
+        // ¿Alias libre? ("_" es comodín en las búsquedas, por eso se escapa)
+        const libre = await db.from("perfiles").select("alias").ilike("alias", alias.replace(/_/g, "\\_")).limit(1);
+        if (libre.data && libre.data.length) { $("login-error").textContent = t("aliasOcupado"); return; }
+
+        const { data, error } = await db.auth.signUp({
+          email: $("reg-correo").value.trim(),
+          password: $("reg-clave").value,
+          options: { data: { alias }, emailRedirectTo: location.origin + location.pathname }
+        });
+        if (error) {
+          $("login-error").textContent = /already/i.test(error.message) ? t("yaRegistrado") : t("errorGeneral") + error.message;
+          return;
+        }
+        e.target.reset();
+        if (data.session) {                 // cuenta lista de inmediato
+          await actualizarSesion();
+          cerrarCuenta();
+          notificar(t("bienvenido") + "@" + (perfil ? perfil.alias : alias));
+        } else {                            // hay que confirmar el correo primero
+          mostrarVista("entrar");
+          $("login-error").textContent = t("confirmaCorreo");
+        }
+      });
+    });
+
+    // --- Olvidé mi contraseña ---
+    $("olvide").addEventListener("click", async () => {
+      const correo = $("login-correo").value.trim();
+      if (!correo) { $("login-error").textContent = t("escribeCorreo"); return; }
+      await db.auth.resetPasswordForEmail(correo, { redirectTo: location.origin + location.pathname });
+      $("login-error").textContent = t("correoEnviado");
+    });
+    $("vista-clave").addEventListener("submit", (e) => {
+      e.preventDefault();
+      conEspera(e.target, async () => {
+        const { error } = await db.auth.updateUser({ password: $("clave-nueva").value });
+        if (error) { $("login-error").textContent = t("errorGeneral") + error.message; return; }
+        e.target.reset();
+        cerrarCuenta();
+        notificar(t("claveGuardada"));
+      });
+    });
+
+    // --- Salir y eliminar cuenta ---
+    $("btn-salir").addEventListener("click", async () => {
+      await db.auth.signOut();
+      await actualizarSesion();
+      cerrarCuenta();
+      notificar(t("sesionCerrada"));
+    });
+    $("btn-eliminar-cuenta").addEventListener("click", async () => {
+      if (!confirm(t("confirmarEliminarCuenta"))) return;
+      const { error } = await db.rpc("eliminar_mi_cuenta");
+      if (error) { $("login-error").textContent = t("errorGeneral") + error.message; return; }
+      await db.auth.signOut();
+      await actualizarSesion();
+      cerrarCuenta();
+      notificar(t("cuentaEliminada"));
+    });
+
+    // Supabase avisa cuando la sesión cambia (por ejemplo, al volver del
+    // correo de "olvidé mi contraseña")
+    if (usarNube) {
+      db.auth.onAuthStateChange((evento) => {
+        setTimeout(() => {
+          if (evento === "PASSWORD_RECOVERY") abrirCuenta("clave");
+          if (evento === "SIGNED_IN" || evento === "SIGNED_OUT" || evento === "USER_UPDATED") actualizarSesion();
+        }, 0);
+      });
+    }
+    actualizarSesion();
+
+    // =========================================================
+    // PASO 10c: Votos y aportes de la comunidad
+    // =========================================================
+    // Se cargan solo cuando alguien abre un expediente.
+    async function cargarComunidad(r) {
+      const caja = document.querySelector(`.comunidad[data-id="${r.id}"]`);
+      if (!caja) return;
+      const [v, c] = await Promise.all([
+        db.rpc("votos_de", { p_reporte: r.id }),
+        db.from("comentarios").select("id, texto, creado, user_id, perfiles(alias)")
+          .eq("reporte_id", r.id).order("creado").limit(30)
+      ]);
+      if (v.error || c.error) { caja.innerHTML = `<p class="nota">${t("errorComunidad")}</p>`; return; }
+
+      const votos = v.data || { real: 0, falso: 0, mio: null };
+      const miId = sesion ? sesion.user.id : null;
+      const aportes = c.data.map(x => `
+        <div class="aporte">
+          <b>@${escapar(x.perfiles ? x.perfiles.alias : "?")}</b>
+          <time>${escapar(new Date(x.creado).toLocaleDateString(t("locale"), { dateStyle: "medium" }))}</time>
+          ${esAdmin || x.user_id === miId ? `<button class="btn-borrar-com" data-com="${escapar(x.id)}" aria-label="${t("confirmarBorrarAporte")}">×</button>` : ""}
+          <p>${escapar(x.texto)}</p>
+        </div>`).join("");
+
+      caja.innerHTML = `
+        <h4>${t("queOpinas")}</h4>
+        <div class="votos">
+          <button class="btn-voto" data-voto="real" aria-pressed="${votos.mio === "real"}">${t("votoReal")} · <b>${Number(votos.real) || 0}</b></button>
+          <button class="btn-voto" data-voto="falso" aria-pressed="${votos.mio === "falso"}">${t("votoFalso")} · <b>${Number(votos.falso) || 0}</b></button>
+        </div>
+        <h4>${t("aportes")} (${c.data.length})</h4>
+        ${aportes || `<p class="nota">${t("sinAportes")}</p>`}
+        ${sesion
+          ? `<textarea class="txt-aporte" maxlength="500" placeholder="${t("phAporte")}"></textarea>
+             <button class="btn-papel btn-comentar">${t("enviarAporte")}</button>`
+          : `<button class="btn-papel btn-entrar-inline">${t("entraParaOpinar")}</button>`}`;
+    }
+
+    document.addEventListener("click", async (e) => {
+      const caja = e.target.closest(".comunidad");
+      if (!caja) return;
+      const r = todos.find(x => String(x.id) === caja.dataset.id);
+      if (!r) return;
+      const boton = e.target.closest("button");
+      if (!boton) return;
+
+      if (boton.classList.contains("btn-entrar-inline")) { abrirCuenta(); return; }
+
+      if (boton.classList.contains("btn-voto")) {
+        if (!sesion) { abrirCuenta(); return; }
+        boton.disabled = true;
+        const yaVotado = boton.getAttribute("aria-pressed") === "true";
+        // Tocar el mismo voto otra vez lo quita
+        const res = yaVotado
+          ? await db.from("votos").delete().eq("reporte_id", r.id).eq("user_id", sesion.user.id)
+          : await db.from("votos").upsert({ reporte_id: r.id, user_id: sesion.user.id, voto: boton.dataset.voto }, { onConflict: "reporte_id,user_id" });
+        if (res.error) notificar(t("errorGeneral") + res.error.message);
+        cargarComunidad(r);
+      }
+
+      if (boton.classList.contains("btn-comentar")) {
+        const texto = caja.querySelector(".txt-aporte").value.trim();
+        if (texto.length < 3) { notificar(t("aporteCorto")); return; }
+        boton.disabled = true;
+        const { error } = await db.from("comentarios").insert({ reporte_id: r.id, user_id: sesion.user.id, texto });
+        if (error) notificar(t("errorGeneral") + error.message);
+        cargarComunidad(r);
+      }
+
+      if (boton.classList.contains("btn-borrar-com")) {
+        if (!confirm(t("confirmarBorrarAporte"))) return;
+        const { error } = await db.from("comentarios").delete().eq("id", boton.dataset.com);
+        if (error) notificar(t("errorGeneral") + error.message);
+        cargarComunidad(r);
+      }
+    });
+
+    // =========================================================
+    // PASO 10d: Enlace propio de cada caso  (…?caso=<id>)
+    // =========================================================
+    const urlDeCaso = (id) => `${location.origin}${location.pathname}?caso=${encodeURIComponent(id)}`;
+
+    // Mantiene la barra de direcciones al día: lo que ves es lo que compartes
+    function marcarUrl(id) {
+      history.replaceState(null, "", id ? urlDeCaso(id) : location.pathname);
+    }
+
+    document.addEventListener("click", async (e) => {
+      const boton = e.target.closest(".btn-enlace");
+      if (!boton) return;
+      const url = urlDeCaso(boton.dataset.enlace);
+      try {
+        await navigator.clipboard.writeText(url);
+        notificar(t("enlaceCopiado"));
+      } catch (err) {
+        prompt(t("copiarEnlace"), url);   // si el navegador no deja copiar solo
+      }
+    });
+
+    // Si alguien llega con ?caso=… abrimos ese expediente
+    let casoPendiente = new URLSearchParams(location.search).get("caso");
+    function abrirCasoDeLaUrl() {
+      if (!casoPendiente) return;
+      const r = todos.find(x => String(x.id) === casoPendiente);
+      casoPendiente = null;
+      if (r) abrirReporte(r);
+    }
+
+    // =========================================================
+    // PASO 11: Notificaciones, "Acerca de" y donaciones
+    // =========================================================
+    let temporizador = null;
+    function notificar(texto) {
+      const n = $("notificacion");
+      n.textContent = texto;
+      n.classList.add("visible");
+      clearTimeout(temporizador);
+      temporizador = setTimeout(() => n.classList.remove("visible"), 7000);
+    }
+
+    const acerca = $("acerca");
+    const abrirAcerca = () => { acerca.querySelector(".hoja").classList.remove("modo-priv"); acerca.classList.add("abierto"); $("acerca-cerrar").focus(); };
+
+    // Aviso de privacidad: se muestra dentro de la misma hoja
+    function abrirPrivacidad() {
+      const contacto = CONTACTO_EMAIL || t("contactoKofi");
+      $("priv-texto").innerHTML = t("privacidad")
+        .map(([titulo, texto]) => `<p><b>${titulo}</b> ${escapar(texto.replace("{contacto}", contacto))}</p>`).join("");
+      login.classList.remove("abierto");
+      acerca.querySelector(".hoja").classList.add("modo-priv");
+      acerca.classList.add("abierto");
+      acerca.querySelector(".hoja").scrollTop = 0;
+      $("acerca-cerrar").focus();
+    }
+    document.addEventListener("click", (e) => { if (e.target.classList.contains("ver-privacidad")) abrirPrivacidad(); });
+
+    // Aviso de almacenamiento: se muestra hasta que la persona toca "Entendido"
+    let avisoVisto = false;
+    try { avisoVisto = localStorage.getItem("avisoVisto") === "1"; } catch (e) {}
+    if (!avisoVisto) $("aviso-datos").classList.add("visible");
+    $("aviso-ok").addEventListener("click", () => {
+      try { localStorage.setItem("avisoVisto", "1"); } catch (e) {}
+      $("aviso-datos").classList.remove("visible");
+    });
+    const cerrarAcerca = () => acerca.classList.remove("abierto");
+    $("btn-acerca").addEventListener("click", abrirAcerca);
+    $("pie-acerca").addEventListener("click", abrirAcerca);
+    $("acerca-cerrar").addEventListener("click", cerrarAcerca);
+    acerca.addEventListener("click", (e) => { if (e.target === acerca) cerrarAcerca(); });   // clic fuera de la hoja
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") { cerrarAcerca(); cerrarCuenta(); } });
+
+    // Solo mostramos los botones de donar si pusiste un link
+    if (DONACIONES_URL) {
+      ["btn-donar", "acerca-donar"].forEach(id => { $(id).href = DONACIONES_URL; $(id).hidden = false; });
+      $("acerca-donar-texto").hidden = false;
+    }
+
+    // =========================================================
+    // PASO 12: Cambiar de idioma
+    // =========================================================
+    document.querySelectorAll("#idiomas button").forEach(b => {
+      b.addEventListener("click", () => {
+        idioma = b.dataset.lang;
+        try { localStorage.setItem("idioma", idioma); } catch (e) {}
+        aplicarIdioma();
+        // Lo que se dibuja con JavaScript hay que volver a dibujarlo
+        pintar();
+        pintarBrujula();
+        mostrarPaso(pasoActual);
+        pintarCuenta();
+        actualizarReloj();
+        ponerCreditos();
+        pintarNombreFoto();
+        pintarPlegar();
+        $("btn-reproducir").textContent = reproduccion ? t("detener") : t("reproducir");
+        if (!ubicacion) $("ubicacion-texto").textContent = t("sinCoordenadas");
+        else $("ubicacion-texto").textContent = `${t("coordFijadas")}${ubicacion.lat.toFixed(4)}, ${ubicacion.lng.toFixed(4)}`;
+        if (panel.classList.contains("abierto")) $("num-nuevo").textContent = `MIRA-${new Date().getFullYear()}-${t("expNuevo")}`;
+      });
+    });
+  </script>
+</body>
+</html>

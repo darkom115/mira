@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<!--
+  MIRA — Panel de administración
+  ------------------------------------------
+  Solo funciona para cuentas que estén en la tabla "admins".
+  Aunque alguien más abra esta página, la base de datos no le
+  muestra ni le deja cambiar nada (reglas RLS).
+  Aquí puedes: aprobar, explicar, rechazar y eliminar reportes,
+  y borrar aportes de la comunidad.
+-->
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">   <!-- que Google no liste esta página -->
+  <title>MIRA — Panel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <style>
+    :root { --abismo:#05080A; --consola:#0C1316; --linea:#22312F; --ambar:#F2B23A; --tenue:#7E8B86; --sello:#E5484D; --ok:#4FD1C5; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: "IBM Plex Mono", ui-monospace, monospace; background: var(--abismo); color: #D9DED9; font-size: 14px; line-height: 1.5; }
+    button, input, select, textarea { font: inherit; color: inherit; }
+    button { cursor: pointer; background: none; border: 1px solid var(--linea); padding: 7px 12px; }
+    button:hover { border-color: var(--ambar); color: var(--ambar); }
+    button:disabled { opacity: .5; cursor: wait; }
+    :focus-visible { outline: 2px solid var(--ambar); outline-offset: 2px; }
+    a { color: var(--ambar); }
+    [hidden] { display: none !important; }
+
+    header { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; padding: 14px 20px; border-bottom: 1px solid var(--linea); }
+    header strong { color: var(--ambar); letter-spacing: .08em; }
+    header span { color: var(--tenue); }
+    header .espacio { flex: 1; }
+    main { max-width: 980px; margin: 0 auto; padding: 20px; }
+    h2 { font-size: 15px; color: var(--ambar); margin: 28px 0 12px; }
+    #mensaje { margin: 12px 0; color: var(--tenue); min-height: 20px; }
+
+    #entrar { max-width: 340px; margin-top: 30px; display: grid; gap: 10px; }
+    #entrar input { background: var(--consola); border: 1px solid var(--linea); padding: 9px; width: 100%; }
+    #entrar button { background: var(--ambar); color: var(--abismo); font-weight: 600; border: none; padding: 10px; }
+
+    .barra { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 10px; }
+    .barra .espacio { flex: 1; }
+    .barra button { font-size: 12px; }
+    #tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+    #tabs button[aria-pressed="true"] { background: var(--linea); color: var(--ambar); border-color: var(--ambar); }
+
+    .ficha { display: grid; grid-template-columns: 150px 1fr; gap: 16px; padding: 16px; margin-top: 12px; background: var(--consola); border: 1px solid var(--linea); }
+    .ficha img { width: 150px; height: 110px; object-fit: cover; display: block; border: 1px solid var(--linea); }
+    .ficha .sin-foto { width: 150px; height: 110px; display: grid; place-items: center; border: 1px dashed var(--linea); color: var(--tenue); font-size: 12px; }
+    .ficha h3 { font-size: 15px; color: var(--ambar); }
+    .ficha .meta { color: var(--tenue); font-size: 12px; margin: 2px 0 8px; }
+    .ficha .desc { overflow-wrap: anywhere; max-width: 70ch; }
+    .controles { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; align-items: center; }
+    .controles select, .controles input { background: var(--abismo); border: 1px solid var(--linea); padding: 7px; }
+    .controles input { flex: 1; min-width: 180px; }
+    .guardar { border-color: var(--ok); color: var(--ok); }
+    .restaurar { border-color: var(--ok); color: var(--ok); }
+    .definitivo { border-color: var(--sello); color: var(--sello); }
+    .en-papelera { opacity: .75; }
+    .eliminar { border-color: var(--sello); color: var(--sello); margin-left: auto; }
+    .vacio { color: var(--tenue); margin-top: 14px; }
+
+    .aporte { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--linea); }
+    .aporte p { flex: 1; overflow-wrap: anywhere; }
+    .aporte small { color: var(--tenue); display: block; }
+
+    @media (max-width: 600px) { .ficha { grid-template-columns: 1fr; } .eliminar { margin-left: 0; } }
+  </style>
+</head>
+<body>
+  <header>
+    <strong>MIRA</strong>
+    <span>Panel de administración</span>
+    <div class="espacio"></div>
+    <a href="index.html">← Volver al globo</a>
+    <button id="salir" hidden>Cerrar sesión</button>
+  </header>
+
+  <main>
+    <form id="entrar" hidden>
+      <p>Entra con tu cuenta de administrador.</p>
+      <label for="correo">Correo</label>
+      <input id="correo" type="email" autocomplete="username" required>
+      <label for="clave">Contraseña</label>
+      <input id="clave" type="password" autocomplete="current-password" required>
+      <button type="submit">Entrar</button>
+    </form>
+
+    <p id="mensaje" role="status"></p>
+
+    <section id="panel" hidden>
+      <div class="barra">
+        <span id="resumen"></span>
+        <div class="espacio"></div>
+        <button id="exp-json">Exportar JSON</button>
+        <button id="exp-csv">Exportar CSV</button>
+      </div>
+      <div id="tabs"></div>
+      <div id="lista"></div>
+
+      <h2>Aportes recientes de la comunidad</h2>
+      <div id="aportes"></div>
+    </section>
+  </main>
+
+  <script>
+    // Las mismas claves públicas que en index.html
+    const SUPABASE_URL = "https://qaseuvsoghhlwkmnisln.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_iCFgjYpkNpC89MU--Im12w_IMmMx7cq";
+    const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    const $ = (id) => document.getElementById(id);
+    const decir = (texto) => { $("mensaje").textContent = texto; };
+
+    const ESTADOS = ["pendiente", "no_identificado", "ifo", "datos_insuficientes", "descartado", "papelera"];
+    const NOMBRE_ESTADO = {
+      "pendiente": "Pendientes", "no_identificado": "No identificados",
+      "ifo": "IFO (identificados)", "datos_insuficientes": "Datos insuficientes", "descartado": "Descartados",
+      "papelera": "Papelera"
+    };
+    const NOMBRE_CAT = {
+      fani: "FANI", criptido_alado: "Críptido alado", bestia_atmosferica: "Bestia atmosférica",
+      varillas: "Varillas (rods)", serpiente: "Serpiente del cielo", sin_clasificar: "Sin clasificar"
+    };
+    const NOMBRE_FORMA = {
+      luz: "luz", esfera: "esfera", disco: "disco", triangulo: "triángulo", cilindro: "cilindro",
+      ovalo: "óvalo", formacion: "formación", cambiante: "cambiante", irregular: "irregular", otra: "otra"
+    };
+    const NOMBRE_DUR = { segundos: "segundos", min1a5: "1-5 min", min5a30: "5-30 min", mas30: "+30 min" };
+    const NOMBRE_MOM = { dia: "día", crepusculo: "atardecer", noche: "noche" };
+
+    // Misma clasificación de Hynek que usa el sitio público
+    function hynek(r) {
+      if (r.distancia === "cerca") return r.efecto === "ocupante" ? "EC-3" : r.efecto === "rastro" ? "EC-2" : "EC-1";
+      if (r.distancia !== "lejos") return "";
+      if (r.radar) return "DE-3";
+      if (!["fani", "sin_clasificar"].includes(r.categoria)) return "DE";
+      return r.momento === "noche" ? "DE-1" : "DE-2";
+    }
+
+    let reportes = [];
+    let pestana = "pendiente";
+
+    // Ayudante para crear elementos sin usar innerHTML: así el texto que
+    // escribió un usuario nunca se interpreta como código.
+    function crear(etiqueta, props = {}, hijos = []) {
+      const e = document.createElement(etiqueta);
+      Object.entries(props).forEach(([k, v]) => { if (k === "class") e.className = v; else if (k in e) e[k] = v; else e.setAttribute(k, v); });
+      hijos.forEach(h => e.append(h));
+      return e;
+    }
+    const fecha = (f) => new Date(f).toLocaleString("es-MX", { dateStyle: "medium", timeStyle: "short" });
+
+    // ---------- Sesión ----------
+    async function iniciar() {
+      const { data } = await db.auth.getSession();
+      if (!data.session) { $("entrar").hidden = false; $("panel").hidden = true; $("salir").hidden = true; decir(""); return; }
+
+      $("salir").hidden = false;
+      const admin = await db.rpc("es_admin");
+      if (admin.data !== true) {
+        $("entrar").hidden = true; $("panel").hidden = true;
+        decir("Esta cuenta no tiene permisos de administrador.");
+        return;
+      }
+      $("entrar").hidden = true;
+      $("panel").hidden = false;
+      await cargar();
+    }
+
+    $("entrar").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      decir("Verificando…");
+      const { error } = await db.auth.signInWithPassword({ email: $("correo").value.trim(), password: $("clave").value });
+      if (error) { decir("Correo o contraseña incorrectos."); return; }
+      e.target.reset();
+      iniciar();
+    });
+    $("salir").addEventListener("click", async () => { await db.auth.signOut(); iniciar(); });
+
+    // ---------- Reportes ----------
+    async function cargar() {
+      decir("Cargando…");
+      const r = await db.from("reportes").select("*").order("creado", { ascending: false });
+      if (r.error) { decir("No se pudieron cargar los reportes: " + r.error.message); return; }
+      reportes = r.data;
+      decir("");
+      pintar();
+      cargarAportes();
+    }
+
+    function pintar() {
+      // Pestañas con el conteo de cada estado
+      const enPapelera = (r) => Boolean(r.borrado_el);
+      const dePestana = (e) => e === "papelera"
+        ? reportes.filter(enPapelera)
+        : reportes.filter(r => r.estado === e && !enPapelera(r));
+
+      $("tabs").replaceChildren(...ESTADOS.map(e => {
+        const n = dePestana(e).length;
+        const b = crear("button", { textContent: `${NOMBRE_ESTADO[e]} (${n})` });
+        b.setAttribute("aria-pressed", e === pestana);
+        b.addEventListener("click", () => { pestana = e; pintar(); });
+        return b;
+      }));
+
+      const lista = dePestana(pestana);
+      $("lista").replaceChildren(...(lista.length ? lista.map(ficha) : [crear("p", { class: "vacio", textContent: "No hay reportes en esta lista." })]));
+      $("resumen").textContent = `${reportes.filter(r => !enPapelera(r)).length} casos · ${reportes.filter(enPapelera).length} en la papelera`;
+    }
+
+    function ficha(r) {
+      const foto = r.foto_url
+        ? crear("a", { href: r.foto_url, target: "_blank", rel: "noopener" }, [crear("img", { src: r.foto_url, loading: "lazy", alt: "Foto del reporte" })])
+        : crear("div", { class: "sin-foto", textContent: "Sin foto" });
+
+      const estado = crear("select", { "aria-label": "Estado" }, ESTADOS.map(e => crear("option", { value: e, textContent: NOMBRE_ESTADO[e], selected: e === r.estado })));
+      const dictamen = crear("input", { value: r.explicacion || "", maxLength: 500, placeholder: "Dictamen: qué era (solo si es «IFO»)", "aria-label": "Dictamen" });
+      const guardar = crear("button", { class: "guardar", textContent: "Guardar" });
+      const eliminar = crear("button", { class: r.borrado_el ? "eliminar definitivo" : "eliminar", textContent: r.borrado_el ? "Eliminar definitivamente" : "Enviar a la papelera" });
+      const restaurar = r.borrado_el ? crear("button", { class: "restaurar", textContent: "Restaurar" }) : null;
+
+      guardar.addEventListener("click", async () => {
+        guardar.disabled = true;
+        const cambios = { estado: estado.value, explicacion: estado.value === "ifo" ? (dictamen.value.trim() || null) : null };
+        const res = await db.from("reportes").update(cambios).eq("id", r.id).select("id");
+        guardar.disabled = false;
+        if (res.error || !res.data.length) { decir("No se pudo guardar: " + (res.error ? res.error.message : "sin permiso")); return; }
+        Object.assign(r, cambios);
+        decir("Guardado.");
+        pintar();
+      });
+
+      eliminar.addEventListener("click", async () => {
+        if (!r.borrado_el) {
+          // Primer clic: a la papelera. Todavía no se borra nada.
+          if (!confirm("¿Enviar este caso a la papelera? Podrás restaurarlo después.")) return;
+          eliminar.disabled = true;
+          const res = await db.from("reportes").update({ borrado_el: new Date().toISOString() }).eq("id", r.id).select("id");
+          eliminar.disabled = false;
+          if (res.error || !res.data.length) { decir("No se pudo mover: " + (res.error ? res.error.message : "sin permiso")); return; }
+          r.borrado_el = new Date().toISOString();
+          decir("Caso enviado a la papelera.");
+          pintar();
+          return;
+        }
+        // Ya estaba en la papelera: ahora sí se borra de verdad
+        if (!confirm("¿Borrar este caso y su foto PARA SIEMPRE? Esto no se puede deshacer.")) return;
+        eliminar.disabled = true;
+        const res = await db.from("reportes").delete().eq("id", r.id).select("id");
+        if (res.error || !res.data.length) { eliminar.disabled = false; decir("No se pudo eliminar: " + (res.error ? res.error.message : "sin permiso")); return; }
+        if (r.foto_url && r.foto_url.includes("/evidencias/")) {
+          await db.storage.from("evidencias").remove([decodeURIComponent(r.foto_url.split("/evidencias/")[1])]);
+        }
+        reportes = reportes.filter(x => x.id !== r.id);
+        decir("Caso eliminado definitivamente.");
+        pintar();
+        cargarAportes();
+      });
+
+      if (restaurar) restaurar.addEventListener("click", async () => {
+        restaurar.disabled = true;
+        const res = await db.from("reportes").update({ borrado_el: null }).eq("id", r.id).select("id");
+        restaurar.disabled = false;
+        if (res.error || !res.data.length) { decir("No se pudo restaurar: " + (res.error ? res.error.message : "sin permiso")); return; }
+        r.borrado_el = null;
+        decir("Caso restaurado.");
+        pintar();
+      });
+
+      const datos = [
+        crear("h3", { textContent: `${NOMBRE_CAT[r.categoria] || r.categoria} — ${r.lugar}` }),
+        ...(r.revisar ? [crear("p", { class: "meta", style: "color:#F2B23A", textContent: "⚠ " + r.revisar })] : []),
+        crear("p", { class: "meta", textContent: [
+          hynek(r), r.forma ? "forma " + NOMBRE_FORMA[r.forma] : "", r.momento ? NOMBRE_MOM[r.momento] : "",
+          r.duracion ? NOMBRE_DUR[r.duracion] : "", r.testigos ? r.testigos + " testigo(s)" : "",
+          r.radar ? "radar" : "", r.direccion ? "rumbo " + r.direccion : ""
+        ].filter(Boolean).join(" · ") }),
+        crear("p", { class: "meta", textContent: `Visto: ${fecha(r.fecha)} · Enviado: ${fecha(r.creado)} · ${Number(r.lat).toFixed(3)}, ${Number(r.lng).toFixed(3)} · idioma ${r.idioma}` }),
+        crear("p", { class: "desc", textContent: r.descripcion })
+      ];
+      if (r.youtube_id) datos.push(crear("p", {}, [crear("a", { href: "https://www.youtube.com/watch?v=" + encodeURIComponent(r.youtube_id), target: "_blank", rel: "noopener", textContent: "▶ Ver video en YouTube" })]));
+      datos.push(crear("div", { class: "controles" }, [estado, dictamen, guardar, ...(restaurar ? [restaurar] : []), eliminar]));
+
+      return crear("article", { class: "ficha" + (r.borrado_el ? " en-papelera" : "") }, [foto, crear("div", {}, datos)]);
+    }
+
+    // ---------- Aportes ----------
+    async function cargarAportes() {
+      const c = await db.from("comentarios").select("id, texto, creado, reporte_id, perfiles(alias)").order("creado", { ascending: false }).limit(50);
+      if (c.error) { $("aportes").replaceChildren(crear("p", { class: "vacio", textContent: "No se pudieron cargar los aportes: " + c.error.message })); return; }
+      if (!c.data.length) { $("aportes").replaceChildren(crear("p", { class: "vacio", textContent: "Todavía no hay aportes." })); return; }
+
+      $("aportes").replaceChildren(...c.data.map(x => {
+        const rep = reportes.find(r => r.id === x.reporte_id);
+        const borrar = crear("button", { class: "eliminar", textContent: "Borrar" });
+        borrar.addEventListener("click", async () => {
+          if (!confirm("¿Borrar este aporte?")) return;
+          const res = await db.from("comentarios").delete().eq("id", x.id);
+          if (res.error) { decir("No se pudo borrar: " + res.error.message); return; }
+          cargarAportes();
+        });
+        return crear("div", { class: "aporte" }, [
+          crear("p", {}, [
+            crear("small", { textContent: `@${x.perfiles ? x.perfiles.alias : "?"} · ${fecha(x.creado)} · en: ${rep ? rep.lugar : "reporte eliminado"}` }),
+            x.texto
+          ]),
+          borrar
+        ]);
+      }));
+    }
+
+    // ---------- Exportar (respaldo manual) ----------
+    function descargar(nombre, contenido, tipo) {
+      const url = URL.createObjectURL(new Blob([contenido], { type: tipo }));
+      const enlace = crear("a", { href: url, download: nombre });
+      document.body.append(enlace); enlace.click(); enlace.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+    const hoy = () => new Date().toISOString().slice(0, 10);
+
+    $("exp-json").addEventListener("click", () => {
+      descargar(`mira-reportes-${hoy()}.json`, JSON.stringify(reportes, null, 2), "application/json");
+      decir(`${reportes.length} casos exportados en JSON.`);
+    });
+
+    $("exp-csv").addEventListener("click", () => {
+      if (!reportes.length) { decir("No hay nada que exportar."); return; }
+      // Una columna por campo. En CSV, las comillas se escriben dobles.
+      const cols = [...new Set(reportes.flatMap(r => Object.keys(r)))];
+      const celda = (v) => v === null || v === undefined ? "" : `"${String(v).replace(/"/g, '""')}"`;
+      const csv = [cols.join(","), ...reportes.map(r => cols.map(c => celda(r[c])).join(","))].join("\r\n");
+      // El BOM del inicio hace que Excel abra bien los acentos
+      descargar(`mira-reportes-${hoy()}.csv`, "\uFEFF" + csv, "text/csv;charset=utf-8");
+      decir(`${reportes.length} casos exportados en CSV.`);
+    });
+
+    iniciar();
+  </script>
+</body>
+</html>
