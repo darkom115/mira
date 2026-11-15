@@ -116,20 +116,26 @@
     #login { position: fixed; inset: 0; z-index: 50; display: none; background: rgba(0,0,0,0.75); align-items: center; justify-content: center; padding: 16px; }
     #login.abierto { display: flex; }
     #login .hoja { width: 380px; max-width: 100%; padding: 24px 26px; position: relative; }
+    /* La tipografía de máquina de escribir es bonita pero cuesta leerla:
+       se queda en los títulos, y lo que hay que leer o escribir va en mono. */
+    #login label, #login input, #login .nota, #login .enlaces, #login .check,
+    #login .proveedor, #login .separador, #login #perfil-datos, #login #login-error {
+      font-family: var(--mono);
+    }
     #login h2 { font-size: 22px; font-weight: 400; margin-bottom: 6px; }
-    #login label { display: block; margin: 14px 0 4px; font-size: 14px; }
-    #login input { width: 100%; padding: 6px 2px; background: transparent; border: none; border-bottom: 1px solid var(--tinta); font-family: var(--maquina); font-size: 16px; color: var(--tinta); }
+    #login label { display: block; margin: 14px 0 4px; font-size: 13px; letter-spacing: 0.02em; }
+    #login input { width: 100%; padding: 7px 2px; background: transparent; border: none; border-bottom: 1px solid var(--tinta); font-family: var(--mono); font-size: 15px; color: var(--tinta); }
     #login input:focus { outline: none; background: rgba(255,255,255,0.35); }
     #login .entrar { margin-top: 20px; width: 100%; padding: 10px; background: var(--tinta); color: var(--manila); font-family: var(--mono); font-weight: 600; }
     #login .cerrar { position: absolute; top: 8px; right: 12px; font-size: 22px; color: var(--tinta); }
     .proveedor {
-      width: 100%; margin-top: 10px; padding: 9px 12px; background: transparent;
-      border: 1px solid var(--linea); color: var(--ambar); font: inherit; font-size: 13px;
+      width: 100%; margin-top: 10px; padding: 10px 12px; background: transparent;
+      border: 1px solid var(--tinta); color: var(--tinta); font-size: 13px; font-weight: 600;
       display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer;
     }
-    .proveedor:hover { border-color: var(--ambar); }
+    .proveedor:hover { background: rgba(28,26,22,0.07); }
     .proveedor .marca { width: 10px; height: 10px; border-radius: 50%; flex: none; background: var(--c); }
-    .separador { margin: 12px 0 2px; font-size: 11px; color: var(--tenue); text-align: center; }
+    .separador { margin: 14px 0 2px; font-size: 11px; color: rgba(28,26,22,0.6); text-align: center; }
     #login-error { margin-top: 10px; font-family: var(--mono); font-size: 12px; color: var(--sello); min-height: 16px; }
     #sesion { font-size: 11px; color: var(--sello); border: 1px solid var(--sello); padding: 6px 8px; white-space: nowrap; }
     #sesion[hidden] { display: none; }
@@ -2036,10 +2042,16 @@
       const lineas = t("arranque");
       const pantalla = $("arranque");
       const quitar = () => pantalla.classList.add("fuera");
-      if (matchMedia("(prefers-reduced-motion: reduce)").matches) { quitar(); return; }
+      // Antes esperaba 2,3 segundos en cada visita, y eso se sentía como
+      // "el sitio carga lento". Ahora tarda menos de la mitad y solo
+      // aparece la primera vez que alguien llega.
+      let yaVista = false;
+      try { yaVista = sessionStorage.getItem("arranque") === "visto"; } catch (e) {}
+      if (yaVista || matchMedia("(prefers-reduced-motion: reduce)").matches) { quitar(); return; }
+      try { sessionStorage.setItem("arranque", "visto"); } catch (e) {}
       pantalla.addEventListener("click", quitar);
-      lineas.forEach((l, i) => setTimeout(() => { $("arranque-texto").textContent += l + "\n"; }, 300 + i * 380));
-      setTimeout(quitar, 300 + lineas.length * 380 + 500);
+      lineas.forEach((l, i) => setTimeout(() => { $("arranque-texto").textContent += l + "\n"; }, 120 + i * 170));
+      setTimeout(quitar, 120 + lineas.length * 170 + 320);
     })();
 
     // =========================================================
