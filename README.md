@@ -68,7 +68,9 @@ En el proyecto colaboran dos asistentes de IA, y Omar es el puente entre ellos:
   mejoras en `docs/`.
 - **Claude** implementa los cambios en el código.
 
-Reglas para los dos:
+Las reglas completas (quién toca qué carpeta, cómo se entrega un cambio y qué
+nunca se escribe en un repositorio público) están en `docs/como-trabajamos.md`.
+En resumen:
 
 1. **Leer los archivos de este repositorio antes de describir o cambiar algo.**
    Nada de trabajar de memoria: las dos primeras rondas de mejoras describían

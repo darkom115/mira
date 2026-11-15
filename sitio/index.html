@@ -518,7 +518,7 @@
   <div id="rejilla"></div>
 
   <!-- Panel de conteo y filtros -->
-  <section id="registro" aria-label="Contactos registrados">
+  <section id="registro" data-i18n-aria="contactos" aria-label="Contactos registrados">
     <h2 data-i18n="contactos">Contactos registrados</h2>
     <button id="btn-plegar" aria-controls="registro"></button>
     <div id="total">0</div>
@@ -563,7 +563,7 @@
 
   <div id="lectura">Cursor <b id="cursor">—</b></div>
   <div id="pie"><span><span data-i18n="pie">Proyecto independiente · Reportes enviados por la comunidad</span> · </span><button id="pie-acerca" data-i18n="masInfo">Más información</button> · <button class="ver-privacidad" data-i18n="privCorto">Privacidad</button><button class="btn-cuenta solo-movil"></button></div>
-  <div id="aviso-datos" role="region" aria-label="Privacidad">
+  <div id="aviso-datos" role="region" data-i18n-aria="privCorto" aria-label="Privacidad">
     <span data-i18n="bannerDatos"></span>
     <div class="acciones"><button class="ver-privacidad" data-i18n="privTitulo">Aviso de privacidad</button><button id="aviso-ok" data-i18n="entendido">Entendido</button></div>
   </div>
@@ -572,7 +572,7 @@
   <!-- ===== Acerca de ===== -->
   <div id="acerca" role="dialog" aria-modal="true" aria-labelledby="acerca-titulo">
     <div class="hoja papel">
-      <button class="cerrar" id="acerca-cerrar" aria-label="Cerrar">×</button>
+      <button class="cerrar" id="acerca-cerrar" data-i18n-aria="cerrar" aria-label="Cerrar">×</button>
       <div class="num">MIRA-0000</div>
       <h2 id="acerca-titulo" data-i18n="acercaTitulo">Acerca del archivo</h2>
       <p data-i18n="acerca1"></p>
@@ -593,7 +593,7 @@
   <!-- ===== Acceso de administrador (solo administradores) ===== -->
   <div id="login" role="dialog" aria-modal="true" aria-labelledby="login-titulo">
     <div class="hoja papel">
-      <button type="button" class="cerrar" id="login-cerrar" aria-label="Cerrar">×</button>
+      <button type="button" class="cerrar" id="login-cerrar" data-i18n-aria="cerrar" aria-label="Cerrar">×</button>
 
       <!-- Entrar -->
       <form id="vista-entrar">
@@ -647,8 +647,8 @@
   <div id="aviso-elegir" data-i18n="avisoElegir">Toca el globo en el punto del avistamiento</div>
 
   <!-- ===== Formulario: un expediente en blanco ===== -->
-  <aside id="panel" class="papel" aria-label="Registrar contacto">
-    <button type="button" class="cerrar-panel" id="panel-cerrar" aria-label="Cerrar">×</button>
+  <aside id="panel" class="papel" data-i18n-aria="btnAbrir" aria-label="Registrar contacto">
+    <button type="button" class="cerrar-panel" id="panel-cerrar" data-i18n-aria="cerrar" aria-label="Cerrar">×</button>
     <div class="encabezado">
       <div>
         <div class="num" id="num-nuevo">Expediente nuevo</div>
@@ -936,6 +936,7 @@
         claveAyuda: "Mínimo 8 caracteres. Se guarda cifrada: nadie puede verla, ni el administrador.",
         acepto: "Soy mayor de 18 años y acepto el", avisoPriv: "aviso de privacidad",
         privCorto: "Privacidad", privTitulo: "Aviso de privacidad",
+        cerrar: "Cerrar",
         crearCuenta: "Crear cuenta", yaTengo: "Ya tengo cuenta",
         tuCuenta: "Tu cuenta", sesionComo: "Sesión iniciada como ",
         panelAdmin: "Panel de administración",
@@ -1125,6 +1126,7 @@
         claveAyuda: "At least 8 characters. It's stored encrypted: nobody can see it, not even the admin.",
         acepto: "I'm over 18 and I accept the", avisoPriv: "privacy notice",
         privCorto: "Privacy", privTitulo: "Privacy notice",
+        cerrar: "Close",
         crearCuenta: "Create account", yaTengo: "I already have an account",
         tuCuenta: "Your account", sesionComo: "Signed in as ",
         panelAdmin: "Admin panel",
@@ -1199,6 +1201,8 @@
       document.title = t("tituloPagina");
       document.querySelectorAll("[data-i18n]").forEach(el => { el.textContent = t(el.dataset.i18n); });
       document.querySelectorAll("[data-i18n-ph]").forEach(el => { el.placeholder = t(el.dataset.i18nPh); });
+      // aria-label: el nombre que leen en voz alta los lectores de pantalla
+      document.querySelectorAll("[data-i18n-aria]").forEach(el => { el.setAttribute("aria-label", t(el.dataset.i18nAria)); });
       document.querySelectorAll("#idiomas button").forEach(b => b.setAttribute("aria-pressed", b.dataset.lang === idioma));
     }
 
