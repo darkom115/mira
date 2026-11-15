@@ -247,6 +247,8 @@
     }
 
     /* Trampa para robots: invisible para las personas */
+    .req { color: var(--sello); margin-left: 3px; font-size: 12px; }
+    #nota-obligatorios { margin-bottom: 10px; }
     .trampa { position: absolute !important; left: -9999px !important; width: 1px !important; height: 1px !important; opacity: 0 !important; }
 
     .btn-enlace { margin-top: 10px; font-family: var(--mono); font-size: 12px; color: var(--tinta); text-decoration: underline; }
@@ -297,7 +299,7 @@
     #lectura b { color: var(--ambar); font-weight: 400; }
 
     /* ---------- Pins: puntos de radar ---------- */
-    .blip { position: relative; width: 14px; height: 14px; cursor: pointer; }
+    .blip { position: absolute; top: 0; left: 0; width: 14px; height: 14px; cursor: pointer; }
     .blip i {
       position: absolute; inset: 3px; border-radius: 50%;
       background: var(--c); box-shadow: 0 0 10px var(--c);
@@ -339,8 +341,9 @@
     .expediente { width: 290px; padding: 16px 18px 18px; position: relative; }
     .expediente .num { font-family: var(--mono); font-size: 11px; color: #6b5f45; }
     .expediente h3 { font-size: 20px; font-weight: 400; margin: 2px 0 10px; }
-    .expediente dl { display: grid; grid-template-columns: 62px 1fr; gap: 3px 8px; font-size: 13px; }
-    .expediente dt { color: #6b5f45; }
+    .expediente dl { display: grid; grid-template-columns: 68px 1fr; gap: 3px 8px; font-size: 13px; }
+    .expediente dt { color: #6b5f45; overflow-wrap: anywhere; }
+    .expediente dd { overflow-wrap: anywhere; }
     .expediente p { margin-top: 10px; font-size: 14px; line-height: 1.45; }
     .expediente img { width: 100%; margin-top: 10px; display: block; filter: sepia(0.35) contrast(1.05); border: 1px solid #b9a77c; }
     .expediente .video { position: relative; display: block; }
@@ -351,6 +354,8 @@
     }
     .expediente .cabeza { display: flex; justify-content: space-between; align-items: center; padding-right: 22px; margin-bottom: 8px; }
     .expediente .sello { font-size: 10px; padding: 2px 7px; }
+    .expediente .glosa { color: #6b5f45; font-size: 11px; line-height: 1.35; display: block; }
+    .expediente .glosa-estado { margin: 4px 0 0; }
     .btn-borrar {
       margin-top: 12px; font-family: var(--mono); font-size: 12px;
       color: var(--sello); text-decoration: underline;
@@ -672,6 +677,7 @@
       <input type="text" id="trampa" class="trampa" tabindex="-1" autocomplete="off" aria-hidden="true">
       <div id="pasos" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
       <p id="paso-titulo"></p>
+      <p class="ayuda" id="nota-obligatorios" data-i18n="notaObligatorios"></p>
 
       <!-- ===== Paso 1: qué viste ===== -->
       <fieldset class="paso" data-paso="1">
@@ -714,7 +720,7 @@
           <option value="otra" data-i18n="forma_otra">Otra</option>
         </select>
 
-        <label data-i18n="lblDescripcion" for="descripcion">Descripción</label>
+        <label data-i18n="lblDescripcion" for="descripcion">Descripción</label><span class="req" aria-hidden="true">*</span>
         <textarea id="descripcion" maxlength="1000" data-i18n-ph="phDescripcion" placeholder="Tamaño, color, sonido, hacia dónde se movía…"></textarea>
       </fieldset>
 
@@ -733,13 +739,15 @@
         </div>
         <div id="ubicacion-texto">Sin coordenadas</div>
 
-        <label data-i18n="lblLugar" for="lugar">Nombre del lugar</label>
+        <p class="ayuda nota-privacidad" data-i18n="notaPrivForm"></p>
+
+        <label data-i18n="lblLugar" for="lugar">Nombre del lugar</label><span class="req" aria-hidden="true">*</span>
         <input id="lugar" data-i18n-ph="phLugar" placeholder="Se llena al buscar, o escríbelo" maxlength="200">
 
-        <label data-i18n="lblFecha" for="fecha">Fecha y hora del avistamiento</label>
+        <label data-i18n="lblFecha" for="fecha">Fecha y hora del avistamiento</label><span class="req" aria-hidden="true">*</span>
         <input id="fecha" type="datetime-local">
 
-        <label data-i18n="lblMomento" id="lbl-momento">¿Cuándo fue?</label>
+        <label data-i18n="lblMomento" id="lbl-momento">¿Cuándo fue?</label><span class="req" aria-hidden="true">*</span>
         <div class="opciones" id="momento" role="radiogroup" aria-labelledby="lbl-momento">
           <button type="button" role="radio" data-val="dia" data-i18n="mom_dia">De día</button>
           <button type="button" role="radio" data-val="crepusculo" data-i18n="mom_crepusculo">Al atardecer</button>
@@ -749,7 +757,7 @@
 
       <!-- ===== Paso 3: circunstancias ===== -->
       <fieldset class="paso" data-paso="3" hidden>
-        <label data-i18n="lblDistancia" id="lbl-distancia">¿A qué distancia?</label>
+        <label data-i18n="lblDistancia" id="lbl-distancia">¿A qué distancia?</label><span class="req" aria-hidden="true">*</span>
         <div class="opciones" id="distancia" role="radiogroup" aria-labelledby="lbl-distancia">
           <button type="button" role="radio" data-val="lejos" data-i18n="dist_lejos">Más de 150 m</button>
           <button type="button" role="radio" data-val="cerca" data-i18n="dist_cerca">Menos de 150 m</button>
@@ -931,7 +939,7 @@
         sinZonas: "Todavía no hay casos en este periodo.",
         sinPorFiltro: "Sin resultados con los filtros actuales.",
         ocultos: " ocultos por filtro de tipo",
-        listaTitulo: "Reportes", phBuscarReporte: "Buscar por lugar o tipo",
+        listaTitulo: "Reportes", phBuscarReporte: "Buscar lugar o tipo",
         sinCoincidencias: "Ningún reporte coincide con la búsqueda.",
         elegirFoto: "Elegir foto", sinFoto: "Ninguna foto elegida",
         creditos: "Imágenes © Esri · Búsqueda: Photon/OpenStreetMap",
@@ -960,6 +968,16 @@
         privCorto: "Privacidad", privTitulo: "Aviso de privacidad",
         cerrar: "Cerrar",
         tipoRegistro: "Tipo de registro",
+        notaObligatorios: "Los campos con * son obligatorios.",
+        notaPrivForm: "No pedimos tu nombre ni tu correo. La ubicación se publica redondeada a un kilómetro, para que nadie pueda ubicar tu casa.",
+        evidenciaCorto: "Mide cuánto respaldo tiene el caso, no si es verdad.",
+        glosaEstado: {
+          "pendiente": "Enviado y todavía sin revisar.",
+          "no_identificado": "Revisado y sin explicación convincente hasta ahora.",
+          "ifo": "Revisado y explicado: se identificó qué era.",
+          "datos_insuficientes": "Faltan datos para poder revisarlo.",
+          "descartado": "Revisado y descartado."
+        },
         oTodo: "Todo", oAvistamiento: "Avistamientos", oDocumentado: "Documentados",
         lblOrigen: "¿Lo viste tú?",
         origen_avistamiento: "Sí, yo lo vi",
@@ -1131,7 +1149,7 @@
         sinZonas: "No cases in this period yet.",
         sinPorFiltro: "No results with the current filters.",
         ocultos: " hidden by type filter",
-        listaTitulo: "Reports", phBuscarReporte: "Search by place or type",
+        listaTitulo: "Reports", phBuscarReporte: "Search place or type",
         sinCoincidencias: "No report matches the search.",
         elegirFoto: "Choose photo", sinFoto: "No photo chosen",
         creditos: "Imagery © Esri · Search: Photon/OpenStreetMap",
@@ -1160,6 +1178,16 @@
         privCorto: "Privacy", privTitulo: "Privacy notice",
         cerrar: "Close",
         tipoRegistro: "Record type",
+        notaObligatorios: "Fields marked * are required.",
+        notaPrivForm: "We don't ask for your name or your email. The location is published rounded to one kilometre, so nobody can pinpoint your home.",
+        evidenciaCorto: "It measures how documented the case is, not whether it's true.",
+        glosaEstado: {
+          "pendiente": "Submitted, not reviewed yet.",
+          "no_identificado": "Reviewed, with no convincing explanation so far.",
+          "ifo": "Reviewed and explained: it was identified.",
+          "datos_insuficientes": "Not enough data to review it.",
+          "descartado": "Reviewed and ruled out."
+        },
         oTodo: "All", oAvistamiento: "Sightings", oDocumentado: "Documented",
         lblOrigen: "Did you see it yourself?",
         origen_avistamiento: "Yes, I saw it",
@@ -1525,6 +1553,7 @@
             <span class="sello ${r.estado === "ifo" ? "explicado" : r.estado === "datos_insuficientes" ? "neutro" : ""}">${escapar(t("estados")[r.estado] || String(r.estado || "").toUpperCase())}</span>
             ${r.origen === "documentado" ? `<span class="sello neutro">${t("selloDocumentado")}</span>` : ""}
           </div>
+          <p class="glosa glosa-estado">${t("glosaEstado")[r.estado] || ""}</p>
           <h3>${tp.nombre}</h3>
           <dl>
             ${hy ? `<dt>${t("hynek")}</dt><dd><b>${hy.codigo}</b> · ${hy.nombre}</dd>` : ""}
@@ -1536,7 +1565,7 @@
             ${r.testigos ? `<dt>${t("testigos")}</dt><dd>${Number(r.testigos)}</dd>` : ""}
             ${r.direccion ? `<dt>${t("rumbo")}</dt><dd>${textoRumbo(r.direccion)}</dd>` : ""}
             <dt>${t("testigo")}</dt><dd><span class="tachado">${t("nombreReservado")}</span></dd>
-            <dt>${t("evidencia")}</dt><dd><span class="evidencia-barra" title="${t("explicaEvidencia")}">${"●".repeat(ev)}${"○".repeat(5 - ev)}</span> ${ev}/5</dd>
+            <dt>${t("evidencia")}</dt><dd><span class="evidencia-barra" title="${t("explicaEvidencia")}">${"●".repeat(ev)}${"○".repeat(5 - ev)}</span> ${ev}/5<br><small class="glosa">${t("evidenciaCorto")}</small></dd>
             ${r.fuente ? `<dt>${t("fuente")}</dt><dd>${enlaceFuente(r.fuente)}</dd>` : ""}
             ${r.explicacion ? `<dt>${t("dictamen")}</dt><dd><b>${escapar(r.explicacion)}</b></dd>` : ""}
           </dl>
@@ -2134,7 +2163,9 @@
           const p = f.properties;
           const nombre = [p.name, p.city !== p.name ? p.city : null, p.state, p.country].filter(Boolean).join(", ");
           const [lng, lat] = f.geometry.coordinates;
-          const huella = `${nombre.toLowerCase()}|${lat.toFixed(1)}|${lng.toFixed(1)}`;
+          // Mismo nombre completo = el mismo lugar para quien busca,
+          // aunque Photon los devuelva a kilómetros de distancia.
+          const huella = nombre.toLowerCase();
           if (vistos.has(huella) || mostrados >= 5) return;
           vistos.add(huella); mostrados++;
           const li = document.createElement("li");
