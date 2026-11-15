@@ -1,0 +1,11 @@
+# Respaldos: traen datos de personas, van en un repositorio privado aparte
+respaldos/
+*.zip
+
+# Basura de los sistemas operativos
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Dependencias, si algún día hacen falta
+node_modules/
