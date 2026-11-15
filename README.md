@@ -43,6 +43,8 @@ Ya se corrieron todos, en este orden, sobre el proyecto de Supabase:
 8. `seguridad.sql`
 9. `permisos-respaldo.sql` — deja que la clave `service_role` lea las tablas,
    para el respaldo diario.
+10. `origen.sql` — separa los avistamientos de los casos documentados y saca la
+    fuente a su propio campo.
 
 `semilla.sql` es opcional: mete casos de ejemplo.
 
