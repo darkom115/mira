@@ -249,6 +249,12 @@
     /* Trampa para robots: invisible para las personas */
     .req { color: var(--sello); margin-left: 3px; font-size: 12px; }
     #nota-obligatorios { margin-bottom: 10px; }
+    #leyenda-calor { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 10px; color: var(--tenue); }
+    #leyenda-calor[hidden] { display: none; }
+    .barra-calor { flex: 1; height: 6px; border: 1px solid var(--linea);
+      background: linear-gradient(90deg, rgba(242,178,58,0.25), rgba(242,178,58,0.8) 45%, #F97316 75%, #B3261E); }
+    #barra-tiempo { height: 3px; background: var(--linea); margin-top: 4px; display: none; }
+    #barra-tiempo i { display: block; height: 100%; width: 0; background: var(--ambar); }
     .trampa { position: absolute !important; left: -9999px !important; width: 1px !important; height: 1px !important; opacity: 0 !important; }
 
     .btn-enlace { margin-top: 10px; font-family: var(--mono); font-size: 12px; color: var(--tinta); text-decoration: underline; }
@@ -540,7 +546,10 @@
       </div>
       <button id="btn-reproducir" data-i18n="reproducir">▶ Reproducir</button>
       <div id="hasta" aria-live="polite"></div>
+      <div id="barra-tiempo" aria-hidden="true"><i></i></div>
     </div>
+
+    <p class="glosa" id="leyenda-codigos"></p>
 
     <div class="control">
       <div class="rotulo" data-i18n="tipoRegistro">Tipo de registro</div>
@@ -556,6 +565,11 @@
       <div class="segmentos" id="vistas">
         <button data-vista="radar" data-i18n="radar">Radar</button>
         <button data-vista="calor" data-i18n="calor">Calor</button>
+      </div>
+      <div id="leyenda-calor" hidden>
+        <span data-i18n="calorMenos">menos</span>
+        <span class="barra-calor"></span>
+        <span data-i18n="calorMas">más</span>
       </div>
     </div>
 
@@ -678,6 +692,7 @@
       <div id="pasos" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
       <p id="paso-titulo"></p>
       <p class="ayuda" id="nota-obligatorios" data-i18n="notaObligatorios"></p>
+      <p class="ayuda" id="nota-sin-cuenta" data-i18n="notaSinCuenta"></p>
 
       <!-- ===== Paso 1: qué viste ===== -->
       <fieldset class="paso" data-paso="1">
@@ -969,6 +984,9 @@
         cerrar: "Cerrar",
         tipoRegistro: "Tipo de registro",
         notaObligatorios: "Los campos con * son obligatorios.",
+        notaSinCuenta: "No necesitas cuenta para reportar. La cuenta solo sirve para votar y aportar en los casos.",
+        enElGlobo: "En el globo: ",
+        calorMenos: "menos", calorMas: "más",
         notaPrivForm: "No pedimos tu nombre ni tu correo. La ubicación se publica redondeada a un kilómetro, para que nadie pueda ubicar tu casa.",
         evidenciaCorto: "Mide cuánto respaldo tiene el caso, no si es verdad.",
         glosaEstado: {
@@ -1179,6 +1197,9 @@
         cerrar: "Close",
         tipoRegistro: "Record type",
         notaObligatorios: "Fields marked * are required.",
+        notaSinCuenta: "You don't need an account to report. An account is only for voting and adding to cases.",
+        enElGlobo: "On the globe: ",
+        calorMenos: "fewer", calorMas: "more",
         notaPrivForm: "We don't ask for your name or your email. The location is published rounded to one kilometre, so nobody can pinpoint your home.",
         evidenciaCorto: "It measures how documented the case is, not whether it's true.",
         glosaEstado: {
@@ -1555,6 +1576,7 @@
           </div>
           <p class="glosa glosa-estado">${t("glosaEstado")[r.estado] || ""}</p>
           <h3>${tp.nombre}</h3>
+          ${r.foto ? `<img src="${escapar(r.foto)}" loading="lazy" alt="Fotografía del avistamiento">` : ""}
           <dl>
             ${hy ? `<dt>${t("hynek")}</dt><dd><b>${hy.codigo}</b> · ${hy.nombre}</dd>` : ""}
             ${r.forma ? `<dt>${t("forma")}</dt><dd>${t("forma_" + r.forma)}</dd>` : ""}
@@ -1570,7 +1592,6 @@
             ${r.explicacion ? `<dt>${t("dictamen")}</dt><dd><b>${escapar(r.explicacion)}</b></dd>` : ""}
           </dl>
           <p>${escapar(r.descripcion)}</p>
-          ${r.foto ? `<img src="${escapar(r.foto)}" loading="lazy" alt="Fotografía del avistamiento">` : ""}
           ${video}
           ${esMio ? `<button class="btn-borrar" data-id="${escapar(r.id)}">${t("destruir")}</button>` : ""}
           ${r.nube ? `<button class="btn-enlace" data-enlace="${escapar(r.id)}">${t("copiarEnlace")}</button>` : ""}
@@ -1673,6 +1694,11 @@
       const nOcultos = enPeriodo().length - lista.length;
       $("ocultos").textContent = nOcultos > 0 ? nOcultos + t("ocultos") : "";
       $("filtros").innerHTML = "";
+      // Los puntos del globo van rotulados con un código: aquí se traduce
+      $("leyenda-codigos").textContent = t("enElGlobo") + Object.keys(CATEGORIAS)
+        .map(c => categoria(c))
+        .map(tp => tp.codigo === tp.nombre ? tp.nombre : `${tp.codigo} = ${tp.nombre}`)
+        .join(" · ");
       Object.keys(CATEGORIAS).forEach(clave => {
         const tp = categoria(clave);
         const desde = inicioPeriodo();
@@ -1681,6 +1707,7 @@
         b.className = "filtro";
         b.setAttribute("aria-pressed", visibles.has(clave));
         b.innerHTML = `<span class="punto" style="background:${tp.color}; color:${tp.color}"></span>${tp.nombre}<span class="n">${n}</span>`;
+        b.title = `${tp.codigo} · ${tp.nombre}`;   // el código es lo que se ve en el globo
         b.addEventListener("click", () => {
           visibles.has(clave) ? visibles.delete(clave) : visibles.add(clave);
           pintar();
@@ -1927,6 +1954,7 @@
       document.querySelectorAll("#periodos button").forEach(b => b.setAttribute("aria-pressed", b.dataset.periodo === periodo));
       document.querySelectorAll("#vistas button").forEach(b => b.setAttribute("aria-pressed", b.dataset.vista === vista));
       document.querySelectorAll("#origenes button").forEach(b => b.setAttribute("aria-pressed", b.dataset.origen === origenRegistro));
+      $("leyenda-calor").hidden = vista !== "calor";
     }
     document.querySelectorAll("#periodos button").forEach(b => b.addEventListener("click", () => {
       detenerReproduccion();
@@ -1950,17 +1978,20 @@
       cursorTiempo = null;
       $("btn-reproducir").textContent = t("reproducir");
       $("hasta").textContent = "";
+      $("barra-tiempo").style.display = "none";
     }
     $("btn-reproducir").addEventListener("click", () => {
       if (reproduccion) { detenerReproduccion(); aplicarCursor(); return; }
       const inicio = inicioPeriodo(), fin = Date.now(), DURACION = 6000;   // 6 segundos
       const arranque = performance.now();
       $("btn-reproducir").textContent = t("detener");
+      $("barra-tiempo").style.display = "block";
       reproduccion = setInterval(() => {
         // avance de 0 a 1 según el tiempo real transcurrido
         const avance = Math.min(1, (performance.now() - arranque) / DURACION);
         cursorTiempo = inicio + (fin - inicio) * avance;
         $("hasta").textContent = t("hasta") + new Date(cursorTiempo).toLocaleDateString(t("locale"), { dateStyle: "medium" });
+        $("barra-tiempo").firstElementChild.style.width = Math.round(avance * 100) + "%";
         aplicarCursor();
         if (avance >= 1) { detenerReproduccion(); aplicarCursor(); }
       }, 100);
