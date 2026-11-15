@@ -538,6 +538,15 @@
     </div>
 
     <div class="control">
+      <div class="rotulo" data-i18n="tipoRegistro">Tipo de registro</div>
+      <div class="segmentos" id="origenes">
+        <button data-origen="todo" data-i18n="oTodo">Todo</button>
+        <button data-origen="avistamiento" data-i18n="oAvistamiento">Avistamientos</button>
+        <button data-origen="documentado" data-i18n="oDocumentado">Documentados</button>
+      </div>
+    </div>
+
+    <div class="control">
       <div class="rotulo" data-i18n="vista">Vista</div>
       <div class="segmentos" id="vistas">
         <button data-vista="radar" data-i18n="radar">Radar</button>
@@ -666,6 +675,19 @@
 
       <!-- ===== Paso 1: qué viste ===== -->
       <fieldset class="paso" data-paso="1">
+        <label data-i18n="lblOrigen" for="origen">¿Lo viste tú?</label>
+        <select id="origen">
+          <option value="avistamiento" data-i18n="origen_avistamiento">Sí, yo lo vi</option>
+          <option value="documentado" data-i18n="origen_documentado">No, lo estoy documentando</option>
+        </select>
+        <p class="ayuda" data-i18n="ayudaOrigen"></p>
+
+        <div id="grupo-fuente" hidden>
+          <label data-i18n="lblFuente" for="fuente">Fuente</label>
+          <input type="text" id="fuente" maxlength="200" data-i18n-ph="phFuente">
+          <p class="ayuda" data-i18n="ayudaFuente"></p>
+        </div>
+
         <label data-i18n="lblCategoria" for="categoria">Categoría del fenómeno</label>
         <select id="categoria">
           <option value="fani" data-i18n="cat_fani">FANI</option>
@@ -937,6 +959,16 @@
         acepto: "Soy mayor de 18 años y acepto el", avisoPriv: "aviso de privacidad",
         privCorto: "Privacidad", privTitulo: "Aviso de privacidad",
         cerrar: "Cerrar",
+        tipoRegistro: "Tipo de registro",
+        oTodo: "Todo", oAvistamiento: "Avistamientos", oDocumentado: "Documentados",
+        lblOrigen: "¿Lo viste tú?",
+        origen_avistamiento: "Sí, yo lo vi",
+        origen_documentado: "No, lo estoy documentando",
+        ayudaOrigen: "Un caso documentado es el que recopilas de una nota, un video o un archivo, aunque no estuvieras ahí.",
+        lblFuente: "Fuente", phFuente: "Medio, archivo o enlace de donde lo sacaste",
+        ayudaFuente: "Se publica junto al caso para que cualquiera pueda comprobarlo.",
+        faltaFuente: "Indica de dónde sacaste el caso.",
+        selloDocumentado: "Caso documentado", fuente: "Fuente",
         crearCuenta: "Crear cuenta", yaTengo: "Ya tengo cuenta",
         tuCuenta: "Tu cuenta", sesionComo: "Sesión iniciada como ",
         panelAdmin: "Panel de administración",
@@ -1127,6 +1159,16 @@
         acepto: "I'm over 18 and I accept the", avisoPriv: "privacy notice",
         privCorto: "Privacy", privTitulo: "Privacy notice",
         cerrar: "Close",
+        tipoRegistro: "Record type",
+        oTodo: "All", oAvistamiento: "Sightings", oDocumentado: "Documented",
+        lblOrigen: "Did you see it yourself?",
+        origen_avistamiento: "Yes, I saw it",
+        origen_documentado: "No, I'm documenting it",
+        ayudaOrigen: "A documented case is one you compiled from a report, a video or an archive, even if you weren't there.",
+        lblFuente: "Source", phFuente: "Outlet, archive or link you took it from",
+        ayudaFuente: "It's published with the case so anyone can check it.",
+        faltaFuente: "Say where you took the case from.",
+        selloDocumentado: "Documented case", fuente: "Source",
         crearCuenta: "Create account", yaTengo: "I already have an account",
         tuCuenta: "Your account", sesionComo: "Signed in as ",
         panelAdmin: "Admin panel",
@@ -1310,7 +1352,7 @@
       { id: "ejemplo-0004", categoria: "bestia_atmosferica", lugar: "San Antonio, TX (ejemplo)",  lat: 29.4241, lng: -98.4936,  fecha: haceDias(1),  forma: "luz",       momento: "noche",      distancia: "lejos",  duracion: "min1a5",   testigos: 6, direccion: "estacionario", descripcion: "Varias luces con 'tentáculos' colgando.", estado: "no_identificado" },
       { id: "ejemplo-0005", categoria: "fani",               lugar: "Hermosillo, Son. (ejemplo)", lat: 29.0729, lng: -110.9559, fecha: haceDias(5),  forma: "formacion", momento: "noche",      distancia: "lejos",  duracion: "min1a5",   testigos: 3, direccion: "E",  descripcion: "Fila de luces que cruzó el cielo en línea recta.", estado: "ifo", explicacion: "Tren de satélites Starlink poco después de su lanzamiento." },
       { id: "ejemplo-0006", categoria: "criptido_alado",     lugar: "Apodaca, N.L. (ejemplo)",    lat: 25.7810, lng: -100.1880, fecha: haceDias(2),  forma: "irregular", momento: "dia",        distancia: "lejos",  duracion: "min1a5",   testigos: 1, direccion: "NE", descripcion: "Algo enorme planeando sin hacer ruido, rumbo al aeropuerto.", estado: "no_identificado" },
-      { id: "ejemplo-0007", categoria: "varillas",           lugar: "Chihuahua, Chih. (ejemplo)", lat: 28.6700, lng: -106.1200, fecha: haceDias(40), forma: "cilindro",  momento: "dia",        distancia: "lejos",  duracion: "segundos", testigos: 1, descripcion: "Algo alargado que cruzó muy rápido; solo se vio al revisar el video.", estado: "no_identificado" }
+      { id: "ejemplo-0007", categoria: "varillas",           lugar: "Chihuahua, Chih. (ejemplo)", lat: 28.6700, lng: -106.1200, fecha: haceDias(40), forma: "cilindro",  momento: "dia",        distancia: "lejos",  duracion: "segundos", testigos: 1, descripcion: "Algo alargado que cruzó muy rápido; solo se vio al revisar el video.", estado: "no_identificado", origen: "documentado", fuente: "Archivo de ejemplo" }
     ];
 
     // --- Guardado local ---
@@ -1352,6 +1394,7 @@
         categoria: r.categoria, forma: r.forma, lugar: r.lugar, lat: r.lat, lng: r.lng,
         fecha: new Date(r.fecha).toISOString(),
         descripcion: r.descripcion, foto_url: fotoUrl, youtube_id: r.youtube_id,
+        origen: r.origen || "avistamiento", fuente: r.fuente || null,
         idioma: idioma,  // en qué idioma se escribió el reporte
         direccion: r.direccion || null,
         momento: r.momento, distancia: r.distancia, efecto: r.efecto,
@@ -1457,6 +1500,15 @@
     let todos = [];
     const visibles = new Set(Object.keys(CATEGORIAS));   // tipos que se muestran
 
+    // La fuente puede ser un nombre ("El Universal") o una dirección web:
+    // si es dirección, se muestra como enlace.
+    function enlaceFuente(f) {
+      const texto = escapar(String(f));
+      return /^https?:\/\//i.test(f)
+        ? `<a href="${texto}" target="_blank" rel="noopener noreferrer">${texto}</a>`
+        : texto;
+    }
+
     function htmlExpediente(r) {
       const tp = categoria(r.categoria);
       const hy = hynek(r);                  // DE-1, EC-2…
@@ -1471,6 +1523,7 @@
           <div class="cabeza">
             <span class="num">${numeroExpediente(r)}</span>
             <span class="sello ${r.estado === "ifo" ? "explicado" : r.estado === "datos_insuficientes" ? "neutro" : ""}">${escapar(t("estados")[r.estado] || String(r.estado || "").toUpperCase())}</span>
+            ${r.origen === "documentado" ? `<span class="sello neutro">${t("selloDocumentado")}</span>` : ""}
           </div>
           <h3>${tp.nombre}</h3>
           <dl>
@@ -1484,6 +1537,7 @@
             ${r.direccion ? `<dt>${t("rumbo")}</dt><dd>${textoRumbo(r.direccion)}</dd>` : ""}
             <dt>${t("testigo")}</dt><dd><span class="tachado">${t("nombreReservado")}</span></dd>
             <dt>${t("evidencia")}</dt><dd><span class="evidencia-barra" title="${t("explicaEvidencia")}">${"●".repeat(ev)}${"○".repeat(5 - ev)}</span> ${ev}/5</dd>
+            ${r.fuente ? `<dt>${t("fuente")}</dt><dd>${enlaceFuente(r.fuente)}</dd>` : ""}
             ${r.explicacion ? `<dt>${t("dictamen")}</dt><dd><b>${escapar(r.explicacion)}</b></dd>` : ""}
           </dl>
           <p>${escapar(r.descripcion)}</p>
@@ -1499,23 +1553,26 @@
     // ---------- Filtros: periodo, vista y reproducción ----------
     const DIAS = { "24h": 1, "7d": 7, "30d": 30, "todo": Infinity };
     let periodo = "todo";         // al abrir se ve el archivo completo
+    let origenRegistro = "todo";  // "todo", "avistamiento" o "documentado"
     let vista = "radar";          // "radar" (puntos) o "calor"
     let cursorTiempo = null;      // durante "Reproducir": hasta qué momento mostrar
     const DIA = 86400000;         // milisegundos en un día
 
     const fechaMs = (r) => new Date(r.fecha).getTime();
-    const deTiposVisibles = () => todos.filter(r => visibles.has(claveCat(r.categoria)));
+    // Los reportes viejos no tienen el campo: cuentan como avistamientos
+    const deOrigen = (r) => origenRegistro === "todo" || (r.origen || "avistamiento") === origenRegistro;
+    const deTiposVisibles = () => todos.filter(r => deOrigen(r) && visibles.has(claveCat(r.categoria)));
 
     function inicioPeriodo() {
       if (periodo !== "todo") return Date.now() - DIAS[periodo] * DIA;
-      const fechas = todos.map(fechaMs).filter(n => !isNaN(n));
+      const fechas = todos.filter(deOrigen).map(fechaMs).filter(n => !isNaN(n));
       return fechas.length ? Math.min(...fechas) : Date.now();
     }
 
     // Todos los reportes del periodo elegido (sin importar el filtro de tipo)
     function enPeriodo() {
       const desde = inicioPeriodo();
-      return todos.filter(r => fechaMs(r) >= desde);
+      return todos.filter(r => deOrigen(r) && fechaMs(r) >= desde);
     }
 
     // Los reportes del periodo elegido y de los tipos visibles
@@ -1840,6 +1897,7 @@
     function marcarBotones() {
       document.querySelectorAll("#periodos button").forEach(b => b.setAttribute("aria-pressed", b.dataset.periodo === periodo));
       document.querySelectorAll("#vistas button").forEach(b => b.setAttribute("aria-pressed", b.dataset.vista === vista));
+      document.querySelectorAll("#origenes button").forEach(b => b.setAttribute("aria-pressed", b.dataset.origen === origenRegistro));
     }
     document.querySelectorAll("#periodos button").forEach(b => b.addEventListener("click", () => {
       detenerReproduccion();
@@ -1847,6 +1905,10 @@
     }));
     document.querySelectorAll("#vistas button").forEach(b => b.addEventListener("click", () => {
       vista = b.dataset.vista; marcarBotones(); pintar();
+    }));
+    document.querySelectorAll("#origenes button").forEach(b => b.addEventListener("click", () => {
+      detenerReproduccion();
+      origenRegistro = b.dataset.origen; marcarBotones(); pintar();
     }));
     marcarBotones();
 
@@ -1947,6 +2009,7 @@
     // Revisa que no falte nada antes de pasar al siguiente paso
     function validarPaso(n) {
       if (n === 1 && $("descripcion").value.trim().length < 3) return t("faltaDescripcion");
+      if (n === 1 && $("origen").value === "documentado" && !$("fuente").value.trim()) return t("faltaFuente");
       if (n === 2) {
         if (!ubicacion) return t("faltanCoord");
         if (!$("lugar").value.trim()) return t("faltaLugar");
@@ -1959,6 +2022,11 @@
       }
       return null;
     }
+
+    // El campo de la fuente solo aparece si el caso es documentado
+    function pintarFuente() { $("grupo-fuente").hidden = $("origen").value !== "documentado"; }
+    $("origen").addEventListener("change", pintarFuente);
+    pintarFuente();
 
     $("btn-siguiente").addEventListener("click", () => {
       const error = validarPaso(pasoActual);
@@ -2008,6 +2076,7 @@
     function cerrarFormulario() {
       panel.classList.remove("abierto");
       formulario.reset();
+      pintarFuente();
       ubicacion = null; fotoTexto = null; fotoBlob = null;
       direccionElegida = ""; pintarBrujula();
       [gMomento, gDistancia, gEfecto, gDuracion].forEach(g => g.limpiar());
@@ -2177,6 +2246,9 @@
       }
 
       const nuevo = {
+        origen: $("origen").value,
+        // La fuente solo tiene sentido en un caso documentado
+        fuente: $("origen").value === "documentado" ? ($("fuente").value.trim() || null) : null,
         categoria: $("categoria").value,
         forma: $("forma").value || null,
         lugar: $("lugar").value.trim(),

@@ -220,13 +220,23 @@
 
       const estado = crear("select", { "aria-label": "Estado" }, ESTADOS.map(e => crear("option", { value: e, textContent: NOMBRE_ESTADO[e], selected: e === r.estado })));
       const dictamen = crear("input", { value: r.explicacion || "", maxLength: 500, placeholder: "Dictamen: qué era (solo si es «IFO»)", "aria-label": "Dictamen" });
+      const origen = crear("select", { "aria-label": "Tipo de registro" }, [
+        crear("option", { value: "avistamiento", textContent: "Avistamiento", selected: (r.origen || "avistamiento") === "avistamiento" }),
+        crear("option", { value: "documentado", textContent: "Caso documentado", selected: r.origen === "documentado" })
+      ]);
+      const fuente = crear("input", { value: r.fuente || "", maxLength: 200, placeholder: "Fuente: medio, archivo o enlace", "aria-label": "Fuente" });
       const guardar = crear("button", { class: "guardar", textContent: "Guardar" });
       const eliminar = crear("button", { class: r.borrado_el ? "eliminar definitivo" : "eliminar", textContent: r.borrado_el ? "Eliminar definitivamente" : "Enviar a la papelera" });
       const restaurar = r.borrado_el ? crear("button", { class: "restaurar", textContent: "Restaurar" }) : null;
 
       guardar.addEventListener("click", async () => {
         guardar.disabled = true;
-        const cambios = { estado: estado.value, explicacion: estado.value === "ifo" ? (dictamen.value.trim() || null) : null };
+        const cambios = {
+          estado: estado.value,
+          explicacion: estado.value === "ifo" ? (dictamen.value.trim() || null) : null,
+          origen: origen.value,
+          fuente: fuente.value.trim() || null
+        };
         const res = await db.from("reportes").update(cambios).eq("id", r.id).select("id");
         guardar.disabled = false;
         if (res.error || !res.data.length) { decir("No se pudo guardar: " + (res.error ? res.error.message : "sin permiso")); return; }
@@ -275,6 +285,7 @@
       const datos = [
         crear("h3", { textContent: `${NOMBRE_CAT[r.categoria] || r.categoria} — ${r.lugar}` }),
         ...(r.revisar ? [crear("p", { class: "meta", style: "color:#F2B23A", textContent: "⚠ " + r.revisar })] : []),
+        ...(r.origen === "documentado" ? [crear("p", { class: "meta", textContent: "Caso documentado" + (r.fuente ? " · fuente: " + r.fuente : "") })] : []),
         crear("p", { class: "meta", textContent: [
           hynek(r), r.forma ? "forma " + NOMBRE_FORMA[r.forma] : "", r.momento ? NOMBRE_MOM[r.momento] : "",
           r.duracion ? NOMBRE_DUR[r.duracion] : "", r.testigos ? r.testigos + " testigo(s)" : "",
@@ -284,7 +295,7 @@
         crear("p", { class: "desc", textContent: r.descripcion })
       ];
       if (r.youtube_id) datos.push(crear("p", {}, [crear("a", { href: "https://www.youtube.com/watch?v=" + encodeURIComponent(r.youtube_id), target: "_blank", rel: "noopener", textContent: "▶ Ver video en YouTube" })]));
-      datos.push(crear("div", { class: "controles" }, [estado, dictamen, guardar, ...(restaurar ? [restaurar] : []), eliminar]));
+      datos.push(crear("div", { class: "controles" }, [estado, dictamen, origen, fuente, guardar, ...(restaurar ? [restaurar] : []), eliminar]));
 
       return crear("article", { class: "ficha" + (r.borrado_el ? " en-papelera" : "") }, [foto, crear("div", {}, datos)]);
     }
