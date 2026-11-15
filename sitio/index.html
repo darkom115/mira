@@ -122,6 +122,18 @@
     #login input:focus { outline: none; background: rgba(255,255,255,0.35); }
     #login .entrar { margin-top: 20px; width: 100%; padding: 10px; background: var(--tinta); color: var(--manila); font-family: var(--mono); font-weight: 600; }
     #login .cerrar { position: absolute; top: 8px; right: 12px; font-size: 22px; color: var(--tinta); }
+    .con-google {
+      width: 100%; margin-top: 10px; padding: 9px 12px; background: transparent;
+      border: 1px solid var(--linea); color: var(--ambar); font: inherit; font-size: 13px;
+      display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer;
+    }
+    .con-google:hover { border-color: var(--ambar); }
+    .con-google::before {
+      content: ""; width: 14px; height: 14px; flex: none;
+      background: conic-gradient(from -45deg, #EA4335 0 25%, #FBBC05 0 50%, #34A853 0 75%, #4285F4 0);
+      border-radius: 50%;
+    }
+    .separador { margin: 12px 0 2px; font-size: 11px; color: var(--tenue); text-align: center; }
     #login-error { margin-top: 10px; font-family: var(--mono); font-size: 12px; color: var(--sello); min-height: 16px; }
     #sesion { font-size: 11px; color: var(--sello); border: 1px solid var(--sello); padding: 6px 8px; white-space: nowrap; }
     #sesion[hidden] { display: none; }
@@ -627,6 +639,8 @@
       <form id="vista-entrar">
         <h2 id="login-titulo" data-i18n="entrarTitulo">Entrar al archivo</h2>
         <p class="nota" data-i18n="entrarIntro"></p>
+        <button type="button" class="con-google" data-i18n="conGoogle">Entrar con Google</button>
+        <p class="separador"><span data-i18n="oBien">o con tu correo</span></p>
         <label for="login-correo" data-i18n="correo">Correo</label>
         <input id="login-correo" type="email" autocomplete="email" required>
         <label for="login-clave" data-i18n="contrasena">Contraseña</label>
@@ -638,6 +652,8 @@
       <!-- Crear cuenta -->
       <form id="vista-crear" hidden>
         <h2 data-i18n="crearTitulo">Crear cuenta</h2>
+        <button type="button" class="con-google" data-i18n="crearConGoogle">Crear cuenta con Google</button>
+        <p class="separador"><span data-i18n="oBien">o con tu correo</span></p>
         <label for="reg-alias" data-i18n="alias">Alias público</label>
         <input id="reg-alias" required minlength="3" maxlength="20" pattern="[A-Za-z0-9_]+" autocomplete="nickname">
         <p class="nota" data-i18n="aliasAyuda"></p>
@@ -983,6 +999,9 @@
         privCorto: "Privacidad", privTitulo: "Aviso de privacidad",
         cerrar: "Cerrar",
         tipoRegistro: "Tipo de registro",
+        conGoogle: "Entrar con Google", crearConGoogle: "Crear cuenta con Google",
+        oBien: "o con tu correo",
+        errorGoogle: "No se pudo abrir Google. Intenta de nuevo o entra con tu correo.",
         notaObligatorios: "Los campos con * son obligatorios.",
         notaSinCuenta: "No necesitas cuenta para reportar. La cuenta solo sirve para votar y aportar en los casos.",
         enElGlobo: "En el globo: ",
@@ -1196,6 +1215,9 @@
         privCorto: "Privacy", privTitulo: "Privacy notice",
         cerrar: "Close",
         tipoRegistro: "Record type",
+        conGoogle: "Sign in with Google", crearConGoogle: "Create account with Google",
+        oBien: "or with your email",
+        errorGoogle: "Google couldn't be opened. Try again or use your email.",
         notaObligatorios: "Fields marked * are required.",
         notaSinCuenta: "You don't need an account to report. An account is only for voting and adding to cases.",
         enElGlobo: "On the globe: ",
@@ -2426,9 +2448,15 @@
 
     async function crearPerfil() {
       // El alias se eligió al crear la cuenta; si falta o ya está ocupado, lo pedimos.
-      let alias = sesion.user.user_metadata && sesion.user.user_metadata.alias;
+      const datos = sesion.user.user_metadata || {};
+      let alias = datos.alias;
+      // Quien entra con Google no eligió alias: proponemos uno a partir de
+      // su nombre, pero el correo nunca se publica.
+      const sugerido = String(datos.name || datos.full_name || "")
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^A-Za-z0-9_]/g, "").slice(0, 20);
       for (let intento = 0; intento < 3; intento++) {
-        if (!alias || !/^[A-Za-z0-9_]{3,20}$/.test(alias)) alias = prompt(t("pedirAlias"));
+        if (!alias || !/^[A-Za-z0-9_]{3,20}$/.test(alias)) alias = prompt(t("pedirAlias"), sugerido.length >= 3 ? sugerido : "");
         if (!alias) return;
         alias = alias.trim();
         const { error } = await db.from("perfiles").insert({ user_id: sesion.user.id, alias });
@@ -2454,6 +2482,17 @@
       }
       pintarCuenta();
     }
+
+    // Entrar con Google: Supabase lleva a Google y devuelve a esta misma
+    // página. Al volver, actualizarSesion() se encarga del resto.
+    document.querySelectorAll(".con-google").forEach(b => b.addEventListener("click", async () => {
+      $("login-error").textContent = "";
+      const { error } = await db.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: location.origin + location.pathname + location.search }
+      });
+      if (error) $("login-error").textContent = t("errorGoogle");
+    }));
 
     document.querySelectorAll(".btn-cuenta").forEach(b => b.addEventListener("click", () => abrirCuenta()));
     $("login-cerrar").addEventListener("click", cerrarCuenta);
@@ -2696,6 +2735,9 @@
       $("acerca-cerrar").focus();
     }
     document.addEventListener("click", (e) => { if (e.target.classList.contains("ver-privacidad")) abrirPrivacidad(); });
+    // Dirección propia del aviso, para poder enlazarlo desde fuera
+    // (Google la pide para la pantalla de consentimiento).
+    if (new URLSearchParams(location.search).get("aviso") === "privacidad") setTimeout(abrirPrivacidad, 300);
 
     // Aviso de almacenamiento: se muestra hasta que la persona toca "Entendido"
     let avisoVisto = false;
