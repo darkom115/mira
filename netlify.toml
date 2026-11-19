@@ -5,6 +5,11 @@
 
 [build]
   publish = "sitio"
+  # No publicar cuando el commit no toca el sitio. Cada despliegue cuesta
+  # unos 15 créditos del plan gratuito (300 al mes), y los cambios que solo
+  # tocan docs/ o sql/ no cambian nada de lo que se publica.
+  # Si el comando termina bien (sin diferencias), Netlify se salta la publicación.
+  ignore = "git diff --quiet HEAD^ HEAD -- sitio netlify netlify.toml"
 
 # Función que reescribe las etiquetas de vista previa cuando alguien comparte
 # un enlace del tipo /?caso=<id>. El código está en netlify/edge-functions/.

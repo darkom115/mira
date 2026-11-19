@@ -55,6 +55,19 @@ fecha nueva; la anterior se deja tachada, para no perder el historial.
 - **2026-11-14 — Nada de muro de pago, criptomonedas, ni "informes premium"**
   que prometan verificar lo inverificable.
 
+## Dónde vive el sitio
+
+- **2026-11-18 — El sitio se muda a Cloudflare Pages.** El plan gratuito de
+  Netlify da 300 créditos al mes y cada publicación cuesta unos 15: alcanza
+  para unas 20 al mes. Con 19 publicaciones en cuatro días se agotaron y
+  Netlify pausó los despliegues hasta el 13 de diciembre. Cloudflare Pages
+  da 500 al mes y el sitio es estático. Los pasos están en
+  `docs/mudanza-a-cloudflare.md`.
+- **2026-11-18 — No se borra el sitio de Netlify.** Se queda en línea como
+  respaldo, con su `netlify.toml` y su función, por si hay que volver.
+- **2026-11-18 — Un solo envío por sesión de trabajo.** Cada push a `main`
+  publica y cuesta. Los cambios se juntan en vez de subirlos de uno en uno.
+
 ## Pendiente de decidir
 
 - Moderación con ayuda de IA: ¿solo ordena y etiqueta la cola, o también puede
