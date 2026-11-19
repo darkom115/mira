@@ -237,8 +237,10 @@
     /* Controles segmentados (periodo y vista) */
     .control { margin-bottom: 12px; }
     .control .rotulo { font-size: 11px; color: var(--tenue); margin-bottom: 4px; }
-    .segmentos { display: flex; border: 1px solid var(--linea); }
-    .segmentos button { flex: 1; padding: 6px 0; font-size: 12px; color: var(--tenue); }
+    .segmentos { display: flex; flex-wrap: wrap; border: 1px solid var(--linea); }
+    /* min-width: 0 deja que el botón se encoja; el flex-wrap de arriba
+       evita que la última palabra quede cortada cuando no cabe. */
+    .segmentos button { flex: 1 1 auto; min-width: 0; padding: 6px 4px; font-size: 12px; color: var(--tenue); }
     .segmentos button + button { border-left: 1px solid var(--linea); }
     .segmentos button[aria-pressed="true"] { background: var(--linea); color: var(--ambar); }
     #btn-reproducir { width: 100%; margin-top: 6px; padding: 6px 0; font-size: 12px; border: 1px solid var(--linea); }
@@ -321,6 +323,9 @@
       font-size: 12px; color: var(--tenue);
     }
     #lectura b { color: var(--ambar); font-weight: 400; }
+    /* El pie va centrado y crece con el texto: por debajo de ~820 px
+       los dos se encimaban. Aquí la lectura del cursor se retira. */
+    @media (max-width: 900px) { #lectura { display: none; } }
 
     /* ---------- Pins: puntos de radar ---------- */
     .blip { position: absolute; top: 0; left: 0; width: 14px; height: 14px; cursor: pointer; }
@@ -341,6 +346,9 @@
       position: absolute; left: 20px; top: -2px; white-space: nowrap;
       font-size: 10px; color: var(--c); text-shadow: 0 0 4px #000, 0 0 2px #000;
     }
+    /* De lejos los rótulos se encimaban unos con otros y el color del
+       punto ya dice la categoría: se muestran solo al acercarse. */
+    body.globo-lejos .blip span { display: none; }
     @keyframes pulso { from { transform: scale(1); opacity: 0.8; } to { transform: scale(3); opacity: 0; } }
 
     /* ---------- Papel de expediente (popup y formulario) ---------- */
@@ -434,6 +442,10 @@
     #btn-guardar:disabled { opacity: 0.6; cursor: wait; }
     #btn-cancelar { margin-top: 10px; width: 100%; padding: 8px; font-family: var(--mono); font-size: 12px; color: #6b5f45; text-decoration: underline; }
     #mensaje { margin-top: 10px; font-family: var(--mono); font-size: 12px; color: var(--sello); }
+    #mensaje:empty { display: none; }
+    /* El campo que falta se señala, para que se vea cuál es y no solo
+       que "no pasó nada" al tocar Siguiente. */
+    .falta { outline: 2px solid var(--sello); outline-offset: 3px; border-radius: 2px; }
 
     #aviso-elegir {
       position: fixed; bottom: 50px; left: 50%; transform: translateX(-50%); z-index: 15;
@@ -467,6 +479,9 @@
     /* Selector de foto propio (para poder traducirlo) */
     #panel input.oculto-visual { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; padding: 0; }
     #panel label.btn-papel { display: inline-block; margin: 0 8px 0 0; font-size: 12px; cursor: pointer; }
+    /* Gana a "#panel label { display: block }", que partía la casilla
+       y su texto en dos renglones. */
+    #panel label.check-linea { display: flex; align-items: center; gap: 8px; margin: 14px 0 4px; }
     #foto:focus-visible + .fila-foto label { outline: 2px solid var(--tinta); outline-offset: 2px; }
     .fila-foto { display: flex; align-items: center; flex-wrap: wrap; }
     #foto-nombre { font-family: var(--mono); font-size: 12px; color: #6b5f45; overflow-wrap: anywhere; }
@@ -493,7 +508,8 @@
 
     /* ---------- Celular ---------- */
     @media (max-width: 700px) {
-      .marca span, #reloj, #lectura, #btn-donar, #btn-acerca, #sesion span { display: none; }
+      #reloj, #btn-donar, #btn-acerca, #sesion span { display: none; }
+      .marca span { font-size: 9px; max-width: 124px; letter-spacing: 0; }
       header { gap: 10px; padding: 0 10px; }
       #franja { letter-spacing: 0.12em; }
       #franja .etiqueta { display: none; }   /* en celular solo "hace 3 h · Lugar" */
@@ -502,7 +518,10 @@
       header .btn-cuenta { display: none; }
       body.leyendo #registro { display: none; }   /* al leer un expediente, el panel no estorba */
       .solo-movil { display: inline; margin-left: 8px; color: var(--ambar) !important; }
-      #aviso-datos { bottom: 0; }
+      /* Netlify inyecta su sello (197 x 64) pegado abajo a la derecha y
+         se lleva el toque: dejamos ese espacio libre para que el botón
+         "Entendido" se pueda tocar. */
+      #aviso-datos { bottom: 0; padding-bottom: 76px; }
       #registro { top: auto; bottom: 30px; left: 10px; width: auto; padding: 10px 12px; }
       #registro h2, #registro .ayuda, #modo, #bloque-zonas, .control .rotulo { display: none; }
       #registro { max-height: 55vh; width: 230px; }
@@ -762,7 +781,7 @@
 
       <!-- ===== Paso 2: dónde y cuándo ===== -->
       <fieldset class="paso" data-paso="2" hidden>
-        <label data-i18n="lblUbicacion" for="buscar">Ubicación</label>
+        <label data-i18n="lblUbicacion" for="buscar">Ubicación</label><span class="req" aria-hidden="true">*</span>
         <div class="fila">
           <input id="buscar" data-i18n-ph="phBuscar" placeholder="Ciudad, lugar o coordenadas">
           <button type="button" class="btn-papel" id="btn-buscar" data-i18n="btnBuscar">Buscar</button>
@@ -851,13 +870,14 @@
         <label class="check-linea"><input type="checkbox" id="radar"><span data-i18n="lblRadar">Apareció también en un radar</span></label>
       </fieldset>
 
+      <p id="mensaje" role="alert"></p>
+
       <div class="nav-pasos">
         <button type="button" id="btn-atras" data-i18n="atras" hidden>Atrás</button>
         <button type="button" id="btn-siguiente" data-i18n="siguiente">Siguiente</button>
         <button type="submit" id="btn-guardar" data-i18n="btnGuardar" hidden>Archivar reporte</button>
       </div>
       <button type="button" id="btn-cancelar" data-i18n="btnCancelar">Descartar borrador</button>
-      <p id="mensaje" role="alert"></p>
     </form>
   </aside>
 
@@ -923,6 +943,7 @@
         paso: "Paso", de: "de",
         pasoQue: "Qué viste", pasoDonde: "Dónde y cuándo", pasoComo: "Circunstancias", pasoEvidencia: "Evidencia",
         siguiente: "Siguiente", atras: "Atrás",
+        buscandoLugar: "Buscando el nombre del lugar…",
         faltaDescripcion: "Describe lo que viste.",
         faltaLugar: "Escribe el nombre del lugar.",
         faltaFecha: "Pon la fecha y la hora.",
@@ -1141,6 +1162,7 @@
         paso: "Step", de: "of",
         pasoQue: "What you saw", pasoDonde: "Where and when", pasoComo: "Circumstances", pasoEvidencia: "Evidence",
         siguiente: "Next", atras: "Back",
+        buscandoLugar: "Looking up the place name…",
         faltaDescripcion: "Describe what you saw.",
         faltaLugar: "Write the name of the place.",
         faltaFecha: "Set the date and time.",
@@ -1526,6 +1548,14 @@
     });
     mapa.addControl(new maplibregl.NavigationControl(), "bottom-right");
 
+    // Rótulos de los puntos: solo cuando el globo está cerca
+    const ZOOM_ROTULOS = 4;
+    function ajustarRotulos() {
+      document.body.classList.toggle("globo-lejos", mapa.getZoom() < ZOOM_ROTULOS);
+    }
+    mapa.on("zoom", ajustarRotulos);
+    ajustarRotulos();
+
     // Créditos del mapa en el idioma actual (se vuelven a poner al cambiar de idioma)
     let ctrlCreditos = null;
     function ponerCreditos() {
@@ -1735,11 +1765,17 @@
       $("ocultos").textContent = nOcultos > 0 ? nOcultos + t("ocultos") : "";
       $("filtros").innerHTML = "";
       // Los puntos del globo van rotulados con un código: aquí se traduce
-      $("leyenda-codigos").textContent = t("enElGlobo") + Object.keys(CATEGORIAS)
-        .map(c => categoria(c))
-        .map(tp => tp.codigo === tp.nombre ? tp.nombre : `${tp.codigo} = ${tp.nombre}`)
-        .join(" · ");
-      Object.keys(CATEGORIAS).forEach(clave => {
+      // Un archivo con cuatro categorías en cero parece vacío: solo se
+      // listan las que tienen al menos un caso.
+      const conCasos = Object.keys(CATEGORIAS)
+        .filter(clave => todos.some(r => claveCat(r.categoria) === clave));
+      $("leyenda-codigos").textContent = conCasos.length
+        ? t("enElGlobo") + conCasos
+            .map(c => categoria(c))
+            .map(tp => tp.codigo === tp.nombre ? tp.nombre : `${tp.codigo} = ${tp.nombre}`)
+            .join(" · ")
+        : "";
+      conCasos.forEach(clave => {
         const tp = categoria(clave);
         const desde = inicioPeriodo();
         const n = todos.filter(r => claveCat(r.categoria) === clave && fechaMs(r) >= desde).length;
@@ -2087,6 +2123,7 @@
       pintar();
       return {
         get: () => valor,
+        poner: (v) => { valor = v; pintar(); if (alCambiar) alCambiar(v); },
         limpiar: () => { valor = ""; pintar(); if (alCambiar) alCambiar(""); }
       };
     }
@@ -2108,26 +2145,71 @@
       $("btn-atras").hidden = n === 1;
       $("btn-siguiente").hidden = n === TOTAL_PASOS;
       $("btn-guardar").hidden = n !== TOTAL_PASOS;
+      // La explicación y las dos notas solo en el primer paso
+      const enPaso1 = n === 1;
+      document.querySelector("#panel .intro").hidden = !enPaso1;
+      $("nota-obligatorios").hidden = !enPaso1;
+      $("nota-sin-cuenta").hidden = !enPaso1;
       mensaje.textContent = "";
       panel.scrollTop = 0;
     }
 
     // Revisa que no falte nada antes de pasar al siguiente paso
     function validarPaso(n) {
-      if (n === 1 && $("descripcion").value.trim().length < 3) return t("faltaDescripcion");
-      if (n === 1 && $("origen").value === "documentado" && !$("fuente").value.trim()) return t("faltaFuente");
+      // Devuelve { texto, campo } para poder señalar el campo que falta,
+      // o null si el paso está completo.
+      const falta = (clave, campo) => ({ texto: t(clave), campo });
+      if (n === 1 && $("descripcion").value.trim().length < 3) return falta("faltaDescripcion", "descripcion");
+      if (n === 1 && $("origen").value === "documentado" && !$("fuente").value.trim()) return falta("faltaFuente", "fuente");
       if (n === 2) {
-        if (!ubicacion) return t("faltanCoord");
-        if (!$("lugar").value.trim()) return t("faltaLugar");
-        if (!$("fecha").value) return t("faltaFecha");
-        if (!gMomento.get()) return t("faltaMomento");
+        if (!ubicacion) return falta("faltanCoord", "buscar");
+        if (!$("lugar").value.trim()) return falta("faltaLugar", "lugar");
+        if (!$("fecha").value) return falta("faltaFecha", "fecha");
+        if (!gMomento.get()) return falta("faltaMomento", "momento");
       }
       if (n === 3) {
-        if (!gDistancia.get()) return t("faltaDistancia");
-        if (gDistancia.get() === "cerca" && !gEfecto.get()) return t("faltaEfecto");
+        if (!gDistancia.get()) return falta("faltaDistancia", "distancia");
+        if (gDistancia.get() === "cerca" && !gEfecto.get()) return falta("faltaEfecto", "efecto");
       }
       return null;
     }
+
+    // Señala el campo que falta: lo marca, lo enfoca y lo trae a la vista.
+    // Antes el aviso se dibujaba al final del formulario y en el celular
+    // caía fuera de la pantalla: parecía que el botón no hacía nada.
+    function limpiarSenales() {
+      mensaje.textContent = "";
+      formulario.querySelectorAll(".falta").forEach(e => e.classList.remove("falta"));
+    }
+    function senalar(campo) {
+      formulario.querySelectorAll(".falta").forEach(e => e.classList.remove("falta"));
+      const el = $(campo);
+      if (!el) return;
+      el.classList.add("falta");
+      el.scrollIntoView({ block: "center", behavior: "smooth" });
+      // En los grupos de botones enfocamos el primero
+      const foco = el.matches("input, select, textarea") ? el : el.querySelector("button, input");
+      if (foco) foco.focus({ preventScroll: true });
+    }
+    formulario.addEventListener("input", limpiarSenales);
+    formulario.querySelectorAll(".opciones, #brujula").forEach(g => g.addEventListener("click", limpiarSenales));
+
+    // El momento del día se propone solo a partir de la hora del
+    // avistamiento, que ya se pidió arriba. Es una aproximación (el
+    // atardecer cambia con la época del año), por eso se queda como
+    // propuesta y los tres botones siguen ahí para corregirla.
+    let momentoTocado = false;
+    $("momento").addEventListener("click", () => { momentoTocado = true; });
+    function proponerMomento() {
+      if (momentoTocado) return;
+      const v = $("fecha").value;            // "2026-11-18T20:30", hora local
+      if (!v || v.length < 16) return;
+      const hora = Number(v.slice(11, 13));
+      if (Number.isNaN(hora)) return;
+      gMomento.poner(hora >= 7 && hora < 18 ? "dia" : (hora >= 18 && hora < 21 ? "crepusculo" : "noche"));
+    }
+    $("fecha").addEventListener("input", proponerMomento);
+    $("fecha").addEventListener("change", proponerMomento);
 
     // El campo de la fuente solo aparece si el caso es documentado
     function pintarFuente() { $("grupo-fuente").hidden = $("origen").value !== "documentado"; }
@@ -2136,7 +2218,7 @@
 
     $("btn-siguiente").addEventListener("click", () => {
       const error = validarPaso(pasoActual);
-      if (error) { mensaje.textContent = error; return; }
+      if (error) { mensaje.textContent = error.texto; senalar(error.campo); return; }
       mostrarPaso(pasoActual + 1);
     });
     $("btn-atras").addEventListener("click", () => mostrarPaso(pasoActual - 1));
@@ -2153,6 +2235,7 @@
       if (!$("fecha").value) {
         const local = new Date(ahora.getTime() - ahora.getTimezoneOffset() * 60000);
         $("fecha").value = local.toISOString().slice(0, 16);
+        proponerMomento();
       }
       $("num-nuevo").textContent = `MIRA-${ahora.getFullYear()}-${t("expNuevo")}`;
       mostrarPaso(pasoActual);
@@ -2216,6 +2299,34 @@
       mapa.flyTo({ center: [lng, lat], zoom: Math.max(mapa.getZoom(), 9) });
     }
 
+    // De coordenadas a nombre del lugar. Es el mismo buscador (Photon)
+    // pero al revés, y sirve para que el GPS y el globo llenen solos el
+    // campo "Nombre del lugar", que es obligatorio.
+    async function nombreDeCoordenadas(lat, lng) {
+      try {
+        const url = `https://photon.komoot.io/reverse?lat=${lat}&lon=${lng}`
+                  + (idioma === "en" ? "&lang=en" : "");
+        const datos = await (await fetch(url)).json();
+        const p = datos.features && datos.features[0] && datos.features[0].properties;
+        if (!p) return null;
+        return [p.name, p.city !== p.name ? p.city : null, p.state, p.country]
+               .filter(Boolean).join(", ") || null;
+      } catch (e) { return null; }
+    }
+
+    // Pone la ubicación y, si no se sabe el nombre, lo busca solo.
+    async function ponerUbicacionYNombre(lat, lng) {
+      ponerUbicacion(lat, lng);
+      if ($("lugar").value.trim()) return;      // ya lo escribió el visitante
+      $("lugar").placeholder = t("buscandoLugar");
+      const nombre = await nombreDeCoordenadas(lat, lng);
+      $("lugar").placeholder = t("phLugar");
+      if (nombre && !$("lugar").value.trim()) {
+        $("lugar").value = nombre;
+        limpiarSenales();
+      }
+    }
+
     async function buscar() {
       const texto = $("buscar").value.trim();
       const lista = $("resultados");
@@ -2223,7 +2334,7 @@
       if (!texto) return;
 
       const c = leerCoordenadas(texto);
-      if (c) { ponerUbicacion(c.lat, c.lng); return; }
+      if (c) { ponerUbicacionYNombre(c.lat, c.lng); return; }
 
       lista.innerHTML = `<li>${t("buscando")}</li>`;
       try {
@@ -2268,7 +2379,7 @@
     mapa.on("click", (e) => {
       if (!eligiendo) return;
       eligiendo = false;
-      ponerUbicacion(e.lngLat.lat, e.lngLat.lng);
+      ponerUbicacionYNombre(e.lngLat.lat, e.lngLat.lng);
       $("aviso-elegir").style.display = "none";
       panel.classList.add("abierto");
     });
@@ -2277,7 +2388,7 @@
       if (!navigator.geolocation) { mensaje.textContent = t("sinGps"); return; }
       mensaje.textContent = t("obteniendoGps");
       navigator.geolocation.getCurrentPosition(
-        (pos) => { mensaje.textContent = ""; ponerUbicacion(pos.coords.latitude, pos.coords.longitude); },
+        (pos) => { mensaje.textContent = ""; ponerUbicacionYNombre(pos.coords.latitude, pos.coords.longitude); },
         () => { mensaje.textContent = t("gpsBloqueado"); }
       );
     });
@@ -2336,7 +2447,7 @@
     formulario.addEventListener("submit", async (e) => {
       e.preventDefault();
       mensaje.textContent = "";
-      if (!ubicacion) { mensaje.textContent = t("faltanCoord"); return; }
+      if (!ubicacion) { mostrarPaso(2); mensaje.textContent = t("faltanCoord"); senalar("buscar"); return; }
 
       // Antispam: el campo trampa solo lo llena un robot, y nadie llena
       // cuatro pasos en menos de ocho segundos. En ambos casos fingimos
@@ -2350,7 +2461,7 @@
       // Última revisión de todos los pasos, por si alguien saltó alguno
       for (let n = 1; n <= TOTAL_PASOS; n++) {
         const falta = validarPaso(n);
-        if (falta) { mostrarPaso(n); mensaje.textContent = falta; return; }
+        if (falta) { mostrarPaso(n); mensaje.textContent = falta.texto; senalar(falta.campo); return; }
       }
 
       const nuevo = {
