@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<!--
+  Página para direcciones que no existen.
+
+  Sin este archivo, el alojamiento devolvía la portada con código 200 para
+  cualquier dirección inventada. Eso confunde a los buscadores (ven la misma
+  página repetida mil veces) y a quien escribió mal un enlace, que cree que
+  llegó a algún lado.
+-->
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sin registro — MIRA</title>
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="/favicon.ico">
+  <style>
+    :root {
+      --abismo: #05080A; --consola: #0C1316; --linea: #22312F;
+      --ambar: #F2B23A; --tenue: #7E8B86;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh;
+      display: flex; align-items: center; justify-content: center; padding: 24px;
+      background: var(--abismo); color: var(--tenue);
+      font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 14px; line-height: 1.6;
+    }
+    main { max-width: 440px; border: 1px solid var(--linea); background: var(--consola); padding: 28px; }
+    .codigo { color: var(--ambar); font-size: 12px; letter-spacing: 0.18em; margin-bottom: 18px; }
+    h1 { margin: 0 0 12px; font-size: 20px; color: #E8EDEB; font-weight: 400; letter-spacing: 0.04em; }
+    p { margin: 0 0 20px; }
+    a {
+      display: inline-block; color: var(--ambar); text-decoration: none;
+      border: 1px solid var(--ambar); padding: 9px 16px; letter-spacing: 0.06em;
+    }
+    a:hover, a:focus { background: var(--ambar); color: var(--abismo); }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="codigo">ERROR 404 · SIN REGISTRO</p>
+    <h1>Esta dirección no existe en el archivo</h1>
+    <p>
+      El enlace puede estar mal escrito, o el caso que buscas se retiró
+      después de revisarse.
+    </p>
+    <a href="/">Volver al globo</a>
+  </main>
+</body>
+</html>
