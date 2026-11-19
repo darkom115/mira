@@ -304,6 +304,8 @@
     .check-linea { display: flex; gap: 8px; align-items: center; margin-top: 14px; font-family: var(--mono); font-size: 13px; }
     .check-linea input { width: auto; }
 
+    .credito-foto { margin: -6px 0 10px; font-size: 11px; }
+
     /* Índice de evidencia */
     .evidencia-barra { letter-spacing: 2px; }
     .expediente .sello.neutro { border-color: #6b5f45; color: #6b5f45; }
@@ -862,6 +864,16 @@
         <p class="ayuda" data-i18n="ayudaFoto">No subas fotos donde se vean caras de personas, placas de autos o tu casa.</p>
         <img id="vista-previa" alt="Vista previa de la fotografía">
 
+        <div id="grupo-foto-origen" hidden>
+          <label data-i18n="lblFotoOrigen" for="foto-origen">¿De dónde salió la foto?</label>
+          <select id="foto-origen">
+            <option value="testigo" data-i18n="fo_testigo">La tomó el testigo</option>
+            <option value="prensa" data-i18n="fo_prensa">De una nota o archivo</option>
+            <option value="ilustracion" data-i18n="fo_ilustracion">Es una ilustración</option>
+          </select>
+          <p class="ayuda" data-i18n="ayudaFotoOrigen"></p>
+        </div>
+
         <label data-i18n="lblYoutube" for="youtube">Video en YouTube</label>
         <input id="youtube" placeholder="https://youtu.be/…">
         <p class="ayuda" data-i18n="ayudaYoutube">Opcional. Sube tu video a YouTube y pega el link.</p>
@@ -999,6 +1011,11 @@
         listaTitulo: "Reportes", phBuscarReporte: "Buscar lugar o tipo",
         sinCoincidencias: "Ningún reporte coincide con la búsqueda.",
         elegirFoto: "Elegir foto", sinFoto: "Ninguna foto elegida",
+        lblFotoOrigen: "¿De dónde salió la foto?",
+        fo_testigo: "La tomó el testigo", fo_prensa: "De una nota o archivo", fo_ilustracion: "Es una ilustración",
+        ayudaFotoOrigen: "Solo la foto del testigo cuenta como evidencia. Las demás se publican como contexto, con su etiqueta.",
+        creditoFoto: { testigo: "Foto aportada por el testigo.", prensa: "Foto de una nota o archivo, como contexto. No es del testigo.", ilustracion: "Ilustración o recreación. No es una foto del hecho." },
+        creditoFotoSin: "Falta decir de dónde salió esta foto.",
         creditos: "Imágenes © Esri · Búsqueda: Photon/OpenStreetMap",
         abrirFiltros: "Filtros ▴", cerrarFiltros: "Ocultar ▾",
         tendSube: "en aumento", tendBaja: "a la baja", tendIgual: "estable", tendNueva: "nueva",
@@ -1218,6 +1235,11 @@
         listaTitulo: "Reports", phBuscarReporte: "Search place or type",
         sinCoincidencias: "No report matches the search.",
         elegirFoto: "Choose photo", sinFoto: "No photo chosen",
+        lblFotoOrigen: "Where is the photo from?",
+        fo_testigo: "Taken by the witness", fo_prensa: "From a report or archive", fo_ilustracion: "It's an illustration",
+        ayudaFotoOrigen: "Only the witness's own photo counts as evidence. The rest are published as context, labelled.",
+        creditoFoto: { testigo: "Photo provided by the witness.", prensa: "Photo from a report or archive, as context. Not the witness's.", ilustracion: "Illustration or recreation. Not a photo of the event." },
+        creditoFotoSin: "Where this photo came from is still unrecorded.",
         creditos: "Imagery © Esri · Search: Photon/OpenStreetMap",
         abrirFiltros: "Filters ▴", cerrarFiltros: "Hide ▾",
         tendSube: "rising", tendBaja: "falling", tendIgual: "steady", tendNueva: "new",
@@ -1443,7 +1465,9 @@
     // No dice si es verdad, solo cuánto material lo acompaña.
     function indiceEvidencia(r) {
       let n = 0;
-      if (r.foto) n++;
+      // Solo cuenta la foto del testigo. Una foto de prensa o una
+      // ilustración acompañan al caso, pero no lo respaldan.
+      if (r.foto && r.foto_origen === "testigo") n++;
       if (r.youtube_id) n++;
       if (r.efecto === "rastro") n++;
       if (r.radar) n++;
@@ -1505,6 +1529,7 @@
         fecha: new Date(r.fecha).toISOString(),
         descripcion: r.descripcion, foto_url: fotoUrl, youtube_id: r.youtube_id,
         origen: r.origen || "avistamiento", fuente: r.fuente || null,
+        foto_origen: fotoUrl ? (r.foto_origen || null) : null,
         idioma: idioma,  // en qué idioma se escribió el reporte
         direccion: r.direccion || null,
         momento: r.momento, distancia: r.distancia, efecto: r.efecto,
@@ -1645,7 +1670,8 @@
           </div>
           <p class="glosa glosa-estado">${t("glosaEstado")[r.estado] || ""}</p>
           <h3>${tp.nombre}</h3>
-          ${r.foto ? `<img src="${escapar(r.foto)}" loading="lazy" alt="Fotografía del avistamiento">` : ""}
+          ${r.foto ? `<img src="${escapar(r.foto)}" loading="lazy" alt="Fotografía del avistamiento">
+          <p class="glosa credito-foto">${t("creditoFoto")[r.foto_origen] || t("creditoFotoSin")}</p>` : ""}
           <dl>
             ${hy ? `<dt>${t("hynek")}</dt><dd><b>${hy.codigo}</b> · ${hy.nombre}</dd>` : ""}
             ${r.forma ? `<dt>${t("forma")}</dt><dd>${t("forma_" + r.forma)}</dd>` : ""}
@@ -2216,6 +2242,21 @@
     $("origen").addEventListener("change", pintarFuente);
     pintarFuente();
 
+    // De dónde salió la foto. Si quien reporta lo vio él mismo, la foto
+    // es suya y no hace falta preguntar; en un caso documentado sí,
+    // porque ahí suelen ser fotos de prensa o ilustraciones.
+    function pintarFotoOrigen() {
+      const hayFoto = Boolean($("foto").files && $("foto").files.length) || Boolean(fotoTextoActual());
+      $("grupo-foto-origen").hidden = !(hayFoto && $("origen").value === "documentado");
+    }
+    function fotoOrigenElegido() {
+      const hayFoto = Boolean($("foto").files && $("foto").files.length) || Boolean(fotoTextoActual());
+      if (!hayFoto) return null;
+      return $("origen").value === "documentado" ? $("foto-origen").value : "testigo";
+    }
+    $("origen").addEventListener("change", pintarFotoOrigen);
+    $("foto").addEventListener("change", pintarFotoOrigen);
+
     $("btn-siguiente").addEventListener("click", () => {
       const error = validarPaso(pasoActual);
       if (error) { mensaje.textContent = error.texto; senalar(error.campo); return; }
@@ -2477,6 +2518,7 @@
         fecha: $("fecha").value,
         descripcion: $("descripcion").value.trim(),
         foto: usarNube ? null : fotoTexto,
+        foto_origen: fotoOrigenElegido(),
         youtube_id: youtubeId,
         direccion: direccionElegida || null,
         momento: gMomento.get() || null,

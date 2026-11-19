@@ -229,6 +229,14 @@
         crear("option", { value: "documentado", textContent: "Caso documentado", selected: r.origen === "documentado" })
       ]);
       const fuente = crear("input", { value: r.fuente || "", maxLength: 200, placeholder: "Fuente: medio, archivo o enlace", "aria-label": "Fuente" });
+      // De dónde salió la foto. Solo la del testigo suma al índice de
+      // evidencia; las demás se publican etiquetadas como contexto.
+      const fotoOrigen = r.foto_url ? crear("select", { "aria-label": "Origen de la foto" }, [
+        crear("option", { value: "", textContent: "Foto: sin clasificar", selected: !r.foto_origen }),
+        crear("option", { value: "testigo", textContent: "Foto: del testigo", selected: r.foto_origen === "testigo" }),
+        crear("option", { value: "prensa", textContent: "Foto: de prensa o archivo", selected: r.foto_origen === "prensa" }),
+        crear("option", { value: "ilustracion", textContent: "Foto: ilustración", selected: r.foto_origen === "ilustracion" })
+      ]) : null;
       const guardar = crear("button", { class: "guardar", textContent: "Guardar" });
       const eliminar = crear("button", { class: r.borrado_el ? "eliminar definitivo" : "eliminar", textContent: r.borrado_el ? "Eliminar definitivamente" : "Enviar a la papelera" });
       const restaurar = r.borrado_el ? crear("button", { class: "restaurar", textContent: "Restaurar" }) : null;
@@ -239,7 +247,8 @@
           estado: estado.value,
           explicacion: estado.value === "ifo" ? (dictamen.value.trim() || null) : null,
           origen: origen.value,
-          fuente: fuente.value.trim() || null
+          fuente: fuente.value.trim() || null,
+          ...(fotoOrigen ? { foto_origen: fotoOrigen.value || null } : {})
         };
         const res = await db.from("reportes").update(cambios).eq("id", r.id).select("id");
         guardar.disabled = false;
@@ -299,7 +308,7 @@
         crear("p", { class: "desc", textContent: r.descripcion })
       ];
       if (r.youtube_id) datos.push(crear("p", {}, [crear("a", { href: "https://www.youtube.com/watch?v=" + encodeURIComponent(r.youtube_id), target: "_blank", rel: "noopener", textContent: "▶ Ver video en YouTube" })]));
-      datos.push(crear("div", { class: "controles" }, [estado, dictamen, origen, fuente, guardar, ...(restaurar ? [restaurar] : []), eliminar]));
+      datos.push(crear("div", { class: "controles" }, [estado, dictamen, origen, fuente, ...(fotoOrigen ? [fotoOrigen] : []), guardar, ...(restaurar ? [restaurar] : []), eliminar]));
 
       return crear("article", { class: "ficha" + (r.borrado_el ? " en-papelera" : "") }, [foto, crear("div", {}, datos)]);
     }
